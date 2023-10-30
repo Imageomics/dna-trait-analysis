@@ -1,1 +1,0 @@
-pysradb metadata SRR12848663 --detailed | head > metadata.txt
