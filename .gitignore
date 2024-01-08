@@ -1,4 +1,5 @@
 data/
+results
 *.pt
 
 # Byte-compiled / optimized / DLL files

@@ -26,13 +26,13 @@ def get_data_matrix_from_vcfs(vcfs):
     data = []
     for vcf in vcfs:
         if vcf.lft == 0 and vcf.rht == 0:
-            data.append([1, 0, 0, 0])
+            data.append([1, 0, 0])
         elif vcf.lft == 0 and vcf.rht == 1:
-            data.append([0, 1, 0, 0])
+            data.append([0, 1, 0])
         elif vcf.lft == 1 and vcf.rht == 0:
-            data.append([0, 0, 1, 0])
+            data.append([0, 1, 0])
         elif vcf.lft == 1 and vcf.rht == 1:
-            data.append([0, 0, 0, 1])
+            data.append([0, 0, 1])
     return np.array(data)
 
 def parse_patternize_csv(path):
@@ -46,6 +46,15 @@ def parse_patternize_csv(path):
             data[name] = np.array(vals)
 
     return data
+
+def get_chromo_info(path, index):
+    with open(path, 'r') as f:
+        line = f.readlines()[index]
+        line = line.strip()
+        cols = line.split("\t")
+        chromo, pos, ref_alle, alt_alle = cols[:4]
+        return chromo, pos, ref_alle, alt_alle
+
 
 
 def parse_vcfs(path):
