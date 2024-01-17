@@ -32,23 +32,29 @@ def plot_attribution_graph(model, train_dataloader, val_dataloader, test_dataloa
     
             attr_total = attr_total / np.linalg.norm(attr_total, ord=1) # Normalize
     
-            plt.figure(figsize=(20, 10))
 
-            ax = plt.subplot()
-            ax.set_title('Occlusion attribution of each SNP')
-            ax.set_ylabel('Attributions')
+            for i in range(2):
+                plt.figure(figsize=(20, 10))
+                ax = plt.subplot()
+                ax.set_title('Occlusion attribution of each SNP')
+                ax.set_ylabel('Attributions')
 
-            FONT_SIZE = 16
-            plt.rc('font', size=FONT_SIZE)            # fontsize of the text sizes
-            plt.rc('axes', titlesize=FONT_SIZE)       # fontsize of the axes title
-            plt.rc('axes', labelsize=FONT_SIZE)       # fontsize of the x and y labels
-            plt.rc('legend', fontsize=FONT_SIZE - 4)  # fontsize of the legend
+                FONT_SIZE = 16
+                plt.rc('font', size=FONT_SIZE)            # fontsize of the text sizes
+                plt.rc('axes', titlesize=FONT_SIZE)       # fontsize of the axes title
+                plt.rc('axes', labelsize=FONT_SIZE)       # fontsize of the x and y labels
+                plt.rc('legend', fontsize=FONT_SIZE - 4)  # fontsize of the legend
 
-            print("Plotting")
-            ax.bar(np.arange(len(attr_total)), attr_total, align='center', alpha=0.8, color='#eb5e7c')
-            print("End Plotting")
-            #ax.autoscale_view()
-            plt.tight_layout()
-
-            plt.savefig(os.path.join(outdir, f"{run_type}_attribution.png"))
-            plt.close()
+                print("Plotting")
+                y = attr_total
+                if i == 1:
+                    y = np.abs(attr_total)
+                ax.bar(np.arange(len(attr_total)), y, align='center', alpha=0.8, color='#eb5e7c')
+                print("End Plotting")
+                #ax.autoscale_view()
+                plt.tight_layout()
+                fname = f"{run_type}_attribution"
+                if i == 1:
+                    fname += "_abs"
+                plt.savefig(os.path.join(outdir, f"{fname}.png"))
+                plt.close()
