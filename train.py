@@ -7,11 +7,7 @@ from argparse import ArgumentParser
 
 from tqdm import tqdm
 
-from multiprocessing import Pool
-from functools import partial
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
@@ -20,9 +16,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from evaluation import plot_attribution_graph
-
-#from pytorch_grad_cam import GradCAM
-#from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from logger import Logger
 
 from models.net import ConvNet, SoyBeanNet, LargeNet
 from data_tools import parse_patternize_csv
@@ -77,7 +71,7 @@ def train(args, tr_dloader, val_dloader, model, logger):
     best_err = 999999
     train_losses = []
     val_losses = []
-    for epoch in tqdm(range(args.epochs), desc="Training Batch of models", colour="green"):
+    for epoch in tqdm(range(args.epochs), desc="Training", colour="green"):
 
         # Training
         total_rmse = 0
@@ -109,6 +103,20 @@ def train(args, tr_dloader, val_dloader, model, logger):
 
     return train_losses, val_losses
 
+def test(tr_dloader, val_dloader, test_dloader, model):
+    rmses = []
+    for dl in [tr_dloader, val_dloader, test_dloader]:
+        total_rmse = 0
+        for batch in dl:
+            mse, rmse = forward_step(model, batch, None, args, is_train=False)
+            total_rmse += rmse
+
+        avg_rmse = total_rmse / len(tr_dloader)
+        rmses.append(avg_rmse)
+
+    return rmses
+
+
 def get_norm_vals(data):
     out_data = np.array([d[2] for d in data])
 
@@ -135,18 +143,6 @@ def get_args():
 
     return parser.parse_args()
 
-class Logger:
-    def __init__(self, args):
-        self.args = args
-        self.outdir = os.path.join(args.output_dir, args.exp_name)
-        os.makedirs(self.outdir, exist_ok=True)
-
-    def log(self, x):
-        with open(os.path.join(self.outdir, "out.log"), 'a') as f:
-            f.write(x + '\n')
-            if self.args.verbose:
-                print(x)
-
 def plot_loss_curves(train_losses, val_losses, outdir):
     fig = plt.figure()
     ax = plt.gca()
@@ -163,15 +159,8 @@ def plot_loss_curves(train_losses, val_losses, outdir):
     plt.savefig(os.path.join(outdir, "loss_curves.png"))
     plt.close()
 
-if __name__ == "__main__":
-    args = get_args()
-    logger = Logger(args)
-
+def load_data(args):
     input_data = np.load(args.input_data)['arr_0']
-    num_vcfs = input_data.shape[1]
-
-    logger.log(f"Input size: {num_vcfs}")
-    logger.log(f"Number of out dimensions used: {args.out_dims}")
 
     metadata = load_json(args.input_metadata)
     pca_data = parse_patternize_csv(args.pca_loadings)
@@ -189,13 +178,33 @@ if __name__ == "__main__":
     train_split = train_data[:train_idx]
     val_split = train_data[train_idx:train_idx+val_idx]
     test_split = train_data[train_idx+val_idx:]
+
+    return train_split, val_split, test_split
+
+def log_data_splits(train_split, val_split, test_split, logger):
     logger.log(f"Dataset sizes: train - {len(train_split)} | val - {len(val_split)} | test - {len(test_split)}")
+    for split_type, split in zip(["train", "val", "test"], [train_split, val_split, test_split]):
+        out_str = ""
+        for name, _, _ in split:
+            out_str += name + ","
+        out_str = out_str[:-1]
+        with open(os.path.join(logger.outdir, f"{split_type}_split.txt"), 'w') as f:
+            f.write(out_str)
+
+if __name__ == "__main__":
+    args = get_args()
+    logger = Logger(args)
+
+    train_split, val_split, test_split = load_data(args)
+    log_data_splits(train_split, val_split, test_split, logger)
+
+    num_vcfs = train_split[0][1].shape[0]
+
+    logger.log(f"Input size: {num_vcfs}")
+    logger.log(f"Number of out dimensions used: {args.out_dims}")
 
     out_mu, out_std = get_norm_vals(train_split)
 
-    #train_dataset = VCF_Dataset(train_split, norm_vals=(out_mu, out_std))
-    #val_dataset = VCF_Dataset(val_split, norm_vals=(out_mu, out_std))
-    #test_dataset = VCF_Dataset(test_split, norm_vals=(out_mu, out_std))
     train_dataset = VCF_Dataset(train_split)
     val_dataset = VCF_Dataset(val_split)
     test_dataset = VCF_Dataset(test_split)
@@ -211,6 +220,10 @@ if __name__ == "__main__":
     end_t = time.perf_counter()
     total_duration = end_t - start_t
     logger.log(f"Total training time: {total_duration:.2f}s")
+
+    logger.log(f"Testing")
+    rmses = test(train_dataloader, val_dataloader, test_dataloader, model)
+    logger.log(f"Train RMSE: {rmses[0]} | Val RMSE: {rmses[1]} | Test RMSE: {rmses[2]}")
 
     plot_loss_curves(train_losses, val_losses, logger.outdir)
 

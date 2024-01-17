@@ -55,8 +55,6 @@ def get_chromo_info(path, index):
         chromo, pos, ref_alle, alt_alle = cols[:4]
         return chromo, pos, ref_alle, alt_alle
 
-
-
 def parse_vcfs(path):
     vcfs = []
     with open(path, 'r') as f:
