@@ -8,8 +8,7 @@ from argparse import ArgumentParser
 from tqdm import tqdm
 
 import torch
-import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 
 import numpy as np
 
@@ -19,50 +18,9 @@ from evaluation import plot_attribution_graph
 from logger import Logger
 
 from models.net import ConvNet, SoyBeanNet, LargeNet
-from data_tools import parse_patternize_csv
+from models.forward import forward_step
+from data_tools import parse_patternize_csv, load_json, VCF_Dataset
 from create_curve_from_sliding_window import create_curve
-
-def load_json(path):
-    with open(path, 'r') as f:
-        return json.load(f)
-
-class VCF_Dataset(Dataset):
-    def __init__(self, data, norm_vals=None):
-        super().__init__()
-        self.data = data
-        self.norm_vals = norm_vals
-
-    def __getitem__(self, idx):
-        name, in_data, out_data = self.data[idx]
-        in_data = torch.tensor(in_data).unsqueeze(0).float()
-        if self.norm_vals is not None:
-            out_data = (out_data - self.norm_vals[0]) / self.norm_vals[1]
-        out_data = torch.tensor(out_data).float()
-
-        return name, in_data, out_data
-
-    def __len__(self):
-        return len(self.data)
-
-def forward_step(model, batch, optimizer, args, is_train=True):
-    name, data, pca = batch
-    data = data.cuda()
-    pca = pca[:, :args.out_dims].cuda()
-    with torch.set_grad_enabled(is_train):
-        if is_train:
-            model.train()
-        else:
-            model.eval()
-        out = model(data)
-        loss = F.mse_loss(out, pca)
-        rmse = torch.sqrt(loss).item()
-
-        if is_train:
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-        
-    return loss.item(), rmse
 
 def train(args, tr_dloader, val_dloader, model, logger):
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
@@ -76,7 +34,7 @@ def train(args, tr_dloader, val_dloader, model, logger):
         # Training
         total_rmse = 0
         for batch in tr_dloader:
-            mse, rmse = forward_step(model, batch, optimizer, args, is_train=True)
+            mse, rmse = forward_step(model, batch, optimizer, args.out_dims, is_train=True)
             total_rmse += rmse
         
         avg_train_rmse = total_rmse / len(tr_dloader)
@@ -84,7 +42,7 @@ def train(args, tr_dloader, val_dloader, model, logger):
         # Validation
         total_rmse = 0
         for batch in val_dataloader:
-            mse, rmse = forward_step(model, batch, None, args, is_train=False)
+            mse, rmse = forward_step(model, batch, None, args.out_dims, is_train=False)
             total_rmse += rmse
 
         avg_val_rmse = total_rmse / len(val_dloader)
@@ -102,20 +60,6 @@ def train(args, tr_dloader, val_dloader, model, logger):
     model.eval()
 
     return train_losses, val_losses
-
-def test(tr_dloader, val_dloader, test_dloader, model):
-    rmses = []
-    for dl in [tr_dloader, val_dloader, test_dloader]:
-        total_rmse = 0
-        for batch in dl:
-            mse, rmse = forward_step(model, batch, None, args, is_train=False)
-            total_rmse += rmse
-
-        avg_rmse = total_rmse / len(tr_dloader)
-        rmses.append(avg_rmse)
-
-    return rmses
-
 
 def get_norm_vals(data):
     out_data = np.array([d[2] for d in data])
@@ -222,7 +166,7 @@ if __name__ == "__main__":
     logger.log(f"Total training time: {total_duration:.2f}s")
 
     logger.log(f"Testing")
-    rmses = test(train_dataloader, val_dataloader, test_dataloader, model)
+    rmses = test(train_dataloader, val_dataloader, test_dataloader, model, args.out_dims)
     logger.log(f"Train RMSE: {rmses[0]} | Val RMSE: {rmses[1]} | Test RMSE: {rmses[2]}")
 
     plot_loss_curves(train_losses, val_losses, logger.outdir)

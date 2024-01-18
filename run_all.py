@@ -2,10 +2,30 @@ import subprocess
 import os
 from copy import copy
 
-python_script = "train.py"
-epochs = 200
 out_dims = 50
-base_cmd = ["python", python_script, "--epochs", str(epochs), "--out_dims", str(out_dims)]
+
+
+RUN_TYPE = 0
+"""
+RUN_TYPE
+
+0: train
+1: evalute
+
+"""
+
+
+if RUN_TYPE == 0:
+    python_script = "train.py"
+    epochs = 200
+    base_cmd = ["python", python_script, "--epochs", str(epochs), "--out_dims", str(out_dims)]
+elif RUN_TYPE == 1:
+    python_script = "evaluate.py"
+    base_cmd = ["python", python_script, "--out_dims", str(out_dims)]
+
+else:
+    assert False, "Invalide RUN_TYPE"
+
 
 vcf_root = "/local/scratch/carlyn.1/dna/vcfs"
 pca_root = "/local/scratch/carlyn.1/dna/colors"
@@ -19,7 +39,7 @@ genes = {
                         "Hmel218003o_optix"]
 }
 
-colors = ["color_1", "color_2", "color_3"]
+colors = ["color_1", "color_2", "color_3", "total"]
 wing_sides = ["forewings", "hindwings"]
 all_species = ["erato", "melpomene"]
 
@@ -35,15 +55,15 @@ for species in all_species:
                 loading_path = os.path.join(pca_root, f"{species}_{wing_side}_PCA", f"PCA_{color}_loadings.csv")
                 cmd += ["--pca_loadings", loading_path]
                 cmd += ["--exp_name", f"{gene}_{wing_side}_{color}"]
-                commands.append(cmd)
+                if color == "total":
+                    commands.append(cmd)
 
 print(f"Total # of commands: {len(commands)}")
-
-avail_gpus = [0,1,2,3,4,5]
+avail_gpus = [4,5,6,7]
 processes = {}
 
-for cmd in commands:
-    print(f"Running command:")
+for i, cmd in enumerate(commands):
+    print(f"Running command ({i+1}/{len(commands)}):")
     print(" ".join(cmd))
     gpu = avail_gpus.pop(0)
     print(f"Using GPU: {gpu}")

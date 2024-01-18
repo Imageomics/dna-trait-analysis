@@ -1,4 +1,30 @@
 import numpy as np
+import json
+
+import torch
+from torch.utils.data import Dataset
+
+def load_json(path):
+    with open(path, 'r') as f:
+        return json.load(f)
+
+class VCF_Dataset(Dataset):
+    def __init__(self, data, norm_vals=None):
+        super().__init__()
+        self.data = data
+        self.norm_vals = norm_vals
+
+    def __getitem__(self, idx):
+        name, in_data, out_data = self.data[idx]
+        in_data = torch.tensor(in_data).unsqueeze(0).float()
+        if self.norm_vals is not None:
+            out_data = (out_data - self.norm_vals[0]) / self.norm_vals[1]
+        out_data = torch.tensor(out_data).float()
+
+        return name, in_data, out_data
+
+    def __len__(self):
+        return len(self.data)
 
 class VCF:
     def __init__(self, specimen, chromo, pos, ref_alle, alt_alle, lft, rht):
