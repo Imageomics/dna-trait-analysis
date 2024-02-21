@@ -18,10 +18,16 @@ def test(tr_dloader, val_dloader, test_dloader, model, out_dims):
             mse, rmse = forward_step(model, batch, None, out_dims, is_train=False)
             total_rmse += rmse
 
-        avg_rmse = total_rmse / len(tr_dloader)
+        avg_rmse = total_rmse / len(dl)
         rmses.append(avg_rmse)
 
     return rmses
+
+def compile_attribution(attr):
+    attr, _ = attr.max(-1)
+    attr = attr[:, 0] # Only has 1 channel, just extract it
+    attr = attr.sum(0) # Sum across batch...Should we be summing here???
+    return attr.detach().cpu().numpy()
 
 def get_attribution_points(model, dloader):
     att_model = Occlusion(model)
@@ -30,29 +36,50 @@ def get_attribution_points(model, dloader):
         model.zero_grad()
         name, data, pca = batch
         attr = att_model.attribute(data.cuda(), target=0, sliding_window_shapes=(1, 200, 3), strides=20, show_progress=True)
-        #attr = att_m.attribute(data.cuda(), target=0, show_progress=True)
-        #attr = attr.abs() # Just take the abs value
-        #attr, _ = attr.max(-1) # Max across 1-hot representation of input
-        attr = attr.sum(-1)
-        attr = attr[:, 0] # Only has 1 channel, just extract it
-        attr = attr.sum(0) # Sum across batch
+        attr = compile_attribution(attr)
         if attr_total is None:
-            attr_total = attr.detach().cpu().numpy()
+            attr_total = attr
         else:
-            attr_total += attr.detach().cpu().numpy()
+            attr_total += attr
 
-    attr_total = attr_total / np.linalg.norm(attr_total, ord=1) # Normalize
+    #attr_total = attr_total / np.linalg.norm(attr_total, ord=1) # Normalize
     return attr_total
 
+def get_guided_gradcam_attr(m, dloader):
+    att_model = GuidedGradCam(m, m.block)
+    attr_total = None
+    for i, batch in enumerate(dloader):
+        m.zero_grad()
+        name, data, pca = batch
+        attr = att_model.attribute(data.cuda(), 0)
+        attr = compile_attribution(attr)
+        if attr_total is None:
+            attr_total = attr
+        else:
+            attr_total += attr
 
-def plot_attribution_graph(model, train_dataloader, val_dataloader, test_dataloader, outdir):
+    #attr_total = attr_total / np.linalg.norm(attr_total, ord=1) # Normalize
+    return attr_total
+
+def plot_attribution_graph(model, train_dataloader, val_dataloader, test_dataloader, outdir, ignore_train=False, mode="cam", ignore_plot=False):
     model.eval() 
     #att_m = ShapleyValueSampling(model)  
-    with torch.no_grad():
-        all_att_pts = []
-        for dloader, run_type in zip([train_dataloader, val_dataloader, test_dataloader], ["train", "val", "test"]):
-            attr_total = get_attribution_points(model, dloader)
-            all_att_pts.append(attr_total)
+    
+    all_att_pts = []
+    for dloader, run_type in zip([train_dataloader, val_dataloader, test_dataloader], ["train", "val", "test"]):
+        if ignore_train and run_type == "train":
+            all_att_pts.append([])
+            continue
+            
+        if mode == "cam":
+            attr_total = get_guided_gradcam_attr(model, dloader)
+        elif mode == "occlusion":
+            with torch.no_grad():
+                attr_total = get_attribution_points(model, dloader)
+        else:
+            raise NotImplementedError(f"Attribution mode ({mode}) has not been implemented")
+        all_att_pts.append(attr_total)
+        if not ignore_plot:
             for i in range(2):
                 plt.figure(figsize=(20, 10))
                 ax = plt.subplot()

@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-def forward_step(model, batch, optimizer, out_dims, is_train=True):
+def forward_step(model, batch, optimizer, out_dims, is_train=True, return_diff=False):
     name, data, pca = batch
     data = data.cuda()
     pca = pca[:, :out_dims].cuda()
@@ -18,5 +18,11 @@ def forward_step(model, batch, optimizer, out_dims, is_train=True):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-        
+            
+        if return_diff:
+            with torch.no_grad():
+                diff = (out - pca).abs()[:, 0]
+                best_diff = min(diff).item()
+                worst_diff = max(diff).item()
+                return loss.item(), rmse, best_diff, worst_diff
     return loss.item(), rmse

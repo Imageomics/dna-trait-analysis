@@ -24,7 +24,7 @@ elif RUN_TYPE == 1:
     base_cmd = ["python", python_script, "--out_dims", str(out_dims)]
 
 else:
-    assert False, "Invalide RUN_TYPE"
+    assert False, "Invalid RUN_TYPE"
 
 
 vcf_root = "/local/scratch/carlyn.1/dna/vcfs"

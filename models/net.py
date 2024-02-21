@@ -76,29 +76,68 @@ class LargeNet(nn.Module):
 
 
 class SoyBeanNet(nn.Module):
-    def __init__(self, window_size=200, num_out_dims=10, insize=4):
+    def __init__(self, window_size=200, num_out_dims=10, insize=4, hidden_dim=10, drop_out_prob=0.75):
         super().__init__()
 
         self.block = nn.Sequential(
-            nn.Conv2d(1, 10, kernel_size=(4, insize), padding=0, stride=1),
+            nn.Conv2d(1, hidden_dim, kernel_size=(4, insize), padding=0, stride=1),
             nn.Tanh(),
-            nn.Conv2d(10, 10, kernel_size=(20, 1), padding='same', stride=1), 
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(20, 1), padding='same', stride=1), 
             nn.Tanh(),
         )
-        self.dropout_block = nn.Dropout(0.75)
+        self.dropout_block = nn.Dropout(drop_out_prob)
 
         self.shortcut = nn.Sequential(
-            nn.Conv2d(1, 10, kernel_size=(4, insize), padding=0, stride=1),
+            nn.Conv2d(1, hidden_dim, kernel_size=(4, insize), padding=0, stride=1),
             nn.Tanh(),
         )
 
         self.last_block = nn.Sequential(
-            nn.Conv2d(10, 10, kernel_size=(4, 1), padding='same', stride=1)
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(4, 1), padding='same', stride=1)
         )
 
-        self.dropout_last_block = nn.Dropout(0.75)
+        self.dropout_last_block = nn.Dropout(drop_out_prob)
 
-        num_features = (window_size-3) * 10
+        num_features = (window_size-3) * hidden_dim
+        self.fc = nn.Linear(num_features, num_out_dims)
+
+    def forward(self, x):
+        h = self.block(x)
+        h = self.dropout_block(h)
+        sc = self.shortcut(x)
+        h = self.last_block(h+sc)
+        h = self.dropout_last_block(h)
+        h = h.view(h.shape[0], -1)
+        return self.fc(h)
+    
+class SoyBeanNetLarge(nn.Module):
+    def __init__(self, window_size=200, num_out_dims=10, insize=4, hidden_dim=10, drop_out_prob=0.75):
+        super().__init__()
+
+        self.block = nn.Sequential(
+            nn.Conv2d(1, hidden_dim, kernel_size=(4, insize), padding=0, stride=1),
+            nn.Tanh(),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(20, 1), padding='same', stride=1), 
+            nn.Tanh(),
+        )
+        self.dropout_block = nn.Dropout(drop_out_prob)
+
+        self.shortcut = nn.Sequential(
+            nn.Conv2d(1, hidden_dim, kernel_size=(4, insize), padding=0, stride=1),
+            nn.Tanh(),
+        )
+
+        self.last_block = nn.Sequential(
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(4, 1), padding='same', stride=1),
+            nn.ReLU(),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(4, 1), padding='same', stride=1),
+            nn.ReLU(),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(4, 1), padding='same', stride=1)
+        )
+
+        self.dropout_last_block = nn.Dropout(drop_out_prob)
+
+        num_features = (window_size-3) * hidden_dim
         self.fc = nn.Linear(num_features, num_out_dims)
 
     def forward(self, x):

@@ -1,9 +1,9 @@
 import os
 
 class Logger:
-    def __init__(self, args):
+    def __init__(self, args, exp_name="debug"):
         self.args = args
-        self.outdir = os.path.join(args.output_dir, args.exp_name)
+        self.outdir = os.path.join(args.output_dir, args.exp_name, exp_name)
         os.makedirs(self.outdir, exist_ok=True)
 
     def log(self, x):
