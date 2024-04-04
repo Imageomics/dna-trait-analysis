@@ -25,6 +25,12 @@ def get_all_genes():
                             "Hmel218003o_optix"]
     }
 
+def get_all_large_genes():
+    return {
+        "erato" : ["chrom1801", "Herato1001", "Herato1301", "Herato1505"],
+        "melpomene" : ["Hmel218003o", "Hmel210001o", "Hmel213001o", "Hmel215003o"]
+    }
+
 def get_all_colors():
     return ["color_1", "color_2", "color_3", "total"]
 
@@ -34,9 +40,13 @@ def get_all_wing_sides():
 def get_all_species():
     return ["erato", "melpomene"]
 
-def get_valid_gene(species, gene):
-    genes = get_all_genes()[species]
-    valid_gene = [vg for vg in genes if gene == vg.split("_")[1]]
+def get_valid_gene(species, gene, is_large=False):
+    if is_large:
+        genes = get_all_large_genes()[species]
+        valid_gene = [vg for vg in genes if gene == vg]
+    else:
+        genes = get_all_genes()[species]
+        valid_gene = [vg for vg in genes if gene == vg.split("_")[1]]
     if len(valid_gene) == 0:
         if gene not in genes:
             raise NotImplementedError(f"{gene} not a valid gene option")
@@ -52,9 +62,9 @@ def validate_experiment_params(species, wing, color):
     if color not in get_all_colors():
         raise NotImplementedError(f"{color} not a valid color option")
 
-def get_experiment(species, gene, wing, color):
+def get_experiment(species, gene, wing, color, is_large=False):
     validate_experiment_params(species, wing, color)
-    valid_gene = get_valid_gene(species, gene)
+    valid_gene = get_valid_gene(species, gene, is_large)
 
     gene_vcf_path, metadata_path, pca_loading_path, gene_vcf_tsv_path = get_data_paths(species, valid_gene, wing, color)
     experiment = Experiment(
@@ -86,10 +96,15 @@ def get_root_paths():
 
 def get_data_paths(species, gene, wing, color):
     vcf_root, pca_root = get_root_paths()
-    gene_vcf_path=os.path.join(os.path.join(vcf_root, gene + "_vcfs.npz"))
-    metadata_path=os.path.join(vcf_root, gene + "_names.json")
+    if len(gene.split("_")) == 2:
+        gene_vcf_path=os.path.join(os.path.join(vcf_root, gene + "_vcfs.npz"))
+        metadata_path=os.path.join(vcf_root, gene + "_names.json")
+    else:
+        gene_vcf_path=os.path.join(os.path.join(vcf_root, species, "chrom", gene + "_vcfs.npz"))
+        metadata_path=os.path.join(vcf_root, species, "chrom", gene + "_names.json")
+        
     pca_loading_path=os.path.join(pca_root, f"{species}_{wing}_PCA", f"PCA_{color}_loadings.csv")
-    gene_vcf_tsv_path=os.path.join(vcf_root, species, f"{gene}.tsv")
+    gene_vcf_tsv_path=os.path.join(vcf_root, species, f"{gene}.tsv") #FIXME This is broken for large / whole chromosome 
     
     return gene_vcf_path, metadata_path, pca_loading_path, gene_vcf_tsv_path
         

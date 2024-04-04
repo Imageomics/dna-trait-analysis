@@ -113,6 +113,7 @@ def get_args():
     parser.add_argument("--output_dir", type=str, default="results")
     parser.add_argument("--verbose", action='store_true', default=False)
     parser.add_argument("--all_genes", action='store_true', default=False)
+    parser.add_argument("--is_large", action='store_true', default=False)
     parser.add_argument("--scheduler", type=str, default="none")
     parser.add_argument("--optimizer", type=str, default="adam")
 
@@ -188,7 +189,7 @@ def setup():
         exp_name_d = "_".join(parts)
         gene_str = "all_genes"
     else:
-        experiments = [get_experiment(args.species, args.gene, args.wing, args.color)]
+        experiments = [get_experiment(args.species, args.gene, args.wing, args.color, is_large=args.is_large)]
         exp_name_d = experiments[0].get_experiment_name()
         gene_str = experiments[0].gene
     

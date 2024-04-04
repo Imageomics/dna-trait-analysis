@@ -24,18 +24,20 @@ def test(tr_dloader, val_dloader, test_dloader, model, out_dims):
     return rmses
 
 def compile_attribution(attr):
-    attr, _ = attr.max(-1)
+    attr, _ = torch.abs(attr).max(-1)
     attr = attr[:, 0] # Only has 1 channel, just extract it
-    attr = attr.sum(0) # Sum across batch...Should we be summing here???
-    return attr.detach().cpu().numpy()
+    attr = attr.detach().cpu().numpy()
+    attr = np.abs(attr).sum(0) # Sum across batch...Should we be summing here???
+    #attr = attr.sum(0) # Sum across batch...Should we be summing here???
+    return attr
 
-def get_attribution_points(model, dloader):
+def get_attribution_points(model, dloader, target=0):
     att_model = Occlusion(model)
     attr_total = None
     for i, batch in enumerate(dloader):
         model.zero_grad()
         name, data, pca = batch
-        attr = att_model.attribute(data.cuda(), target=0, sliding_window_shapes=(1, 200, 3), strides=20, show_progress=True)
+        attr = att_model.attribute(data.cuda(), target=target, sliding_window_shapes=(1, 200, 3), strides=20, show_progress=True)
         attr = compile_attribution(attr)
         if attr_total is None:
             attr_total = attr
@@ -45,13 +47,13 @@ def get_attribution_points(model, dloader):
     #attr_total = attr_total / np.linalg.norm(attr_total, ord=1) # Normalize
     return attr_total
 
-def get_guided_gradcam_attr(m, dloader):
-    att_model = GuidedGradCam(m, m.block)
+def get_guided_gradcam_attr(m, dloader, target=0):
+    att_model = GuidedGradCam(m, m.last_block)
     attr_total = None
     for i, batch in enumerate(dloader):
         m.zero_grad()
         name, data, pca = batch
-        attr = att_model.attribute(data.cuda(), 0)
+        attr = att_model.attribute(data.cuda(), target=target)
         attr = compile_attribution(attr)
         if attr_total is None:
             attr_total = attr
@@ -59,6 +61,21 @@ def get_guided_gradcam_attr(m, dloader):
             attr_total += attr
 
     #attr_total = attr_total / np.linalg.norm(attr_total, ord=1) # Normalize
+    return attr_total
+
+def get_saliency_attr(m, dloader, target=0):
+    att_model = Saliency(m)
+    attr_total = None
+    for i, batch in enumerate(dloader):
+        m.zero_grad()
+        name, data, pca = batch
+        attr = att_model.attribute(data.cuda(), target=target)
+        attr = compile_attribution(attr)
+        if attr_total is None:
+            attr_total = attr
+        else:
+            attr_total += attr
+            
     return attr_total
 
 def plot_attribution_graph(model, train_dataloader, val_dataloader, test_dataloader, outdir, ignore_train=False, mode="cam", ignore_plot=False):

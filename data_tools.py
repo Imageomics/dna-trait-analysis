@@ -1,7 +1,9 @@
-import numpy as np
 import json
 
+import numpy as np
 import torch
+
+from tqdm import tqdm
 from torch.utils.data import Dataset
 
 def load_json(path):
@@ -81,11 +83,20 @@ def get_chromo_info(path, index):
         chromo, pos, ref_alle, alt_alle = cols[:4]
         return chromo, pos, ref_alle, alt_alle
 
-def parse_vcfs(path):
+def parse_vcfs(path_to_tsv):
+    """
+    Parses the .tsv file with VCF information into a list of VCF objects
+
+    Args:
+        path_to_tsv (str): Path to .tsv file with VCF information
+
+    Returns:
+        List[VCF]: A list of VCF objects
+    """
     vcfs = []
-    with open(path, 'r') as f:
+    with open(path_to_tsv, 'r') as f:
         lines = f.readlines()
-        for line in lines:
+        for line in tqdm(lines, desc=f"Parsing {path_to_tsv} into VCF objects"):
             line = line.strip()
             cols = line.split("\t")
             chromo, pos, ref_alle, alt_alle = cols[:4]

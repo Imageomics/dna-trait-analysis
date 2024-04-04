@@ -2,6 +2,7 @@ data/
 tmp/
 results
 plot_results
+notebooks/attributions/
 *.pt
 *.out
 *.png
