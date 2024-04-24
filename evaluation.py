@@ -5,6 +5,7 @@ import numpy as np
 import torch
 
 import matplotlib.pyplot as plt
+from scipy.stats import pearsonr
 
 from captum.attr import IntegratedGradients, NoiseTunnel, DeepLift, GradientShap, FeatureAblation, GuidedGradCam, Saliency, Occlusion, ShapleyValueSampling
 from models.forward import forward_step
@@ -23,11 +24,32 @@ def test(tr_dloader, val_dloader, test_dloader, model, out_dims):
 
     return rmses
 
+def calc_pearson_correlation(model, dloader, index=0):
+    model.eval()
+    actual = []
+    predicted = []
+    for i, batch in enumerate(dloader):
+        model.zero_grad()
+        name, data, pca = batch
+        out = model(data.cuda())
+        actual.extend(pca[:, index].detach().cpu().numpy().tolist())
+        predicted.extend(out[:, index].detach().cpu().numpy().tolist())
+    return pearsonr(predicted, actual)
+
 def compile_attribution(attr):
     attr, _ = torch.abs(attr).max(-1)
     attr = attr[:, 0] # Only has 1 channel, just extract it
     attr = attr.detach().cpu().numpy()
     attr = np.abs(attr).sum(0) # Sum across batch...Should we be summing here???
+    #attr = attr.sum(0) # Sum across batch...Should we be summing here???
+    return attr
+
+def compile_attribution_test(attr):
+    #attr, _ = torch.abs(attr).max(-1)
+    attr, _ = torch.abs(attr).max(-1)
+    attr = attr[:, 0] # Only has 1 channel, just extract it
+    attr = attr.detach().cpu().numpy()
+    attr = np.median(np.abs(attr), 0) # Sum across batch...Should we be summing here???
     #attr = attr.sum(0) # Sum across batch...Should we be summing here???
     return attr
 
@@ -55,6 +77,22 @@ def get_guided_gradcam_attr(m, dloader, target=0):
         name, data, pca = batch
         attr = att_model.attribute(data.cuda(), target=target)
         attr = compile_attribution(attr)
+        if attr_total is None:
+            attr_total = attr
+        else:
+            attr_total += attr
+
+    #attr_total = attr_total / np.linalg.norm(attr_total, ord=1) # Normalize
+    return attr_total
+
+def get_guided_gradcam_attr_test(m, dloader, target=0):
+    att_model = GuidedGradCam(m, m.last_block)
+    attr_total = None
+    for i, batch in enumerate(dloader):
+        m.zero_grad()
+        name, data, pca = batch
+        attr = att_model.attribute(data.cuda(), target=target)
+        attr = compile_attribution_test(attr)
         if attr_total is None:
             attr_total = attr
         else:
