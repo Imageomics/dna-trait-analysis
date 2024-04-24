@@ -1,6 +1,11 @@
 data/
+tmp/
 results
+plot_results
+notebooks/attributions/
 *.pt
+*.out
+*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
