@@ -1,4 +1,5 @@
 import os
+from tqdm import tqdm
 
 import numpy as np
 
@@ -8,8 +9,32 @@ import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 
 from captum.attr import IntegratedGradients, NoiseTunnel, DeepLift, GradientShap, FeatureAblation, GuidedGradCam, Saliency, Occlusion, ShapleyValueSampling
-from models.forward import forward_step
+from gtp.models.forward import forward_step
 
+def do_knockout(model, dloader, target=0, out_dims=1):
+    def knockout(batch, pos):
+        name, data, pca = batch
+        # knockout
+        data[:, :, pos] = torch.zeros_like(data[:, :, pos]).to(data.device)
+        return name, data, pca
+    
+    for batch in dloader:
+        dim_size = batch[1].shape[2]
+        break
+    knockout_values = []
+    print(f"DIM SIZE: {dim_size}")
+    for pos in tqdm(range(dim_size), desc="Performing knockout"):
+        total_rmse = 0
+        for batch in dloader:
+            batch = knockout(batch, pos)
+            mse, rmse = forward_step(model, batch, None, out_dims, is_train=False)
+            total_rmse += rmse
+
+        avg_rmse = total_rmse / len(dloader)
+        knockout_values.append(avg_rmse)
+        
+    return knockout_values
+    
 
 def test(tr_dloader, val_dloader, test_dloader, model, out_dims):
     rmses = []
@@ -68,6 +93,32 @@ def get_attribution_points(model, dloader, target=0):
 
     #attr_total = attr_total / np.linalg.norm(attr_total, ord=1) # Normalize
     return attr_total
+
+def get_shapley_sampling_attr(m, dloader, target=0, n_samples=200, n_windows=100):
+    svs = ShapleyValueSampling(m)
+    WINDOWS = n_windows
+    feature_mask = None
+    attr_total = None
+    for i, batch in enumerate(dloader):
+        m.zero_grad()
+        name, data, pca = batch
+        
+        if feature_mask is None:
+            feature_mask = torch.zeros_like(data[0]).unsqueeze(0)
+            ws = data.shape[2]//WINDOWS
+            for j in range(0, WINDOWS, ws):
+                feature_mask[:, :, j*ws:,:] = j
+            feature_mask = feature_mask.cuda()
+
+        attr = svs.attribute(data.cuda(), feature_mask=feature_mask, target=target, n_samples=n_samples, show_progress=True)
+        attr = compile_attribution(attr)
+        if attr_total is None:
+            attr_total = attr
+        else:
+            attr_total += attr
+            
+    return attr_total
+    
 
 def get_guided_gradcam_attr(m, dloader, target=0):
     att_model = GuidedGradCam(m, m.last_block)

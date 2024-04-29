@@ -48,7 +48,7 @@ def train(args, tr_dloader, val_dloader, model, logger):
         # Training
         total_rmse = 0
         for batch in tr_dloader:
-            mse, rmse = forward_step(model, batch, optimizer, args.out_dims, is_train=True)
+            mse, rmse = forward_step(model, batch, optimizer, args.out_dims, out_start_idx=args.out_dims_start_idx, is_train=True)
             total_rmse += rmse
         scheduler.step()
         
@@ -102,6 +102,7 @@ def get_args():
     parser.add_argument("--lr", type=float, default=0.0002)
     parser.add_argument("--drop_out_prob", type=float, default=0.75)
     parser.add_argument("--out_dims", type=int, default=10)
+    parser.add_argument("--out_dims_start_idx", type=int, default=0)
     parser.add_argument("--insize", type=int, default=3)
     parser.add_argument("--hidden_dim", type=int, default=10)
     parser.add_argument("--seed", type=int, default=2)
@@ -110,7 +111,7 @@ def get_args():
     parser.add_argument("--color", type=str, default="color_3")
     parser.add_argument("--wing", type=str, default="forewings")
     parser.add_argument("--exp_name", type=str, default="debug")
-    parser.add_argument("--output_dir", type=str, default="results")
+    parser.add_argument("--output_dir", type=str, default="/home/carlyn.1/dna-trait-analysis/results")
     parser.add_argument("--verbose", action='store_true', default=False)
     parser.add_argument("--all_genes", action='store_true', default=False)
     parser.add_argument("--is_large", action='store_true', default=False)

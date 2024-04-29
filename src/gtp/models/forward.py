@@ -1,10 +1,10 @@
 import torch
 import torch.nn.functional as F
 
-def forward_step(model, batch, optimizer, out_dims, is_train=True, return_diff=False):
+def forward_step(model, batch, optimizer, out_dims, out_start_idx=0, is_train=True, return_diff=False):
     name, data, pca = batch
     data = data.cuda()
-    pca = pca[:, :out_dims].cuda()
+    pca = pca[:, out_start_idx:out_start_idx+out_dims].cuda()
     with torch.set_grad_enabled(is_train):
         if is_train:
             model.train()

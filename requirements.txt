@@ -1,3 +1,10 @@
+matplotlib
+pandas
+tqdm
+
+ipykernel
+
+--extra-index-url https://download.pytorch.org/whl/cu118
 torch
 torchvision
---find-links https://download.pytorch.org/whl/cu181/torch_stable.html
+captum
