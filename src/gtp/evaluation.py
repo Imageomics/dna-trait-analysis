@@ -119,13 +119,16 @@ def get_shapley_sampling_attr(m, dloader, target=0, n_samples=200, n_windows=100
             
     return attr_total
     
-
-def get_guided_gradcam_attr(m, dloader, target=0):
+#TODO: need to refactor, don't need new_new
+def get_guided_gradcam_attr(m, dloader, target=0, use_new=False):
     att_model = GuidedGradCam(m, m.last_block)
     attr_total = None
     for i, batch in enumerate(dloader):
         m.zero_grad()
-        name, data, pca = batch
+        if use_new:
+            data, pca = batch
+        else:
+            name, data, pca = batch
         attr = att_model.attribute(data.cuda(), target=target)
         attr = compile_attribution(attr)
         if attr_total is None:
@@ -167,7 +170,7 @@ def get_saliency_attr(m, dloader, target=0):
             
     return attr_total
 
-def plot_attribution_graph(model, train_dataloader, val_dataloader, test_dataloader, outdir, ignore_train=False, mode="cam", ignore_plot=False):
+def plot_attribution_graph(model, train_dataloader, val_dataloader, test_dataloader, outdir, ignore_train=False, mode="cam", ignore_plot=False, use_new=False):
     model.eval() 
     #att_m = ShapleyValueSampling(model)  
     
@@ -178,7 +181,7 @@ def plot_attribution_graph(model, train_dataloader, val_dataloader, test_dataloa
             continue
             
         if mode == "cam":
-            attr_total = get_guided_gradcam_attr(model, dloader)
+            attr_total = get_guided_gradcam_attr(model, dloader, use_new=use_new)
         elif mode == "occlusion":
             with torch.no_grad():
                 attr_total = get_attribution_points(model, dloader)

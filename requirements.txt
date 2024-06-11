@@ -1,8 +1,13 @@
+tqdm
 matplotlib
 pandas
-tqdm
+pyarrow
+swifter[notebook]
 
+jupyter
 ipykernel
+widgetsnbextension 
+pandas-profiling
 
 --extra-index-url https://download.pytorch.org/whl/cu118
 torch
