@@ -18,7 +18,7 @@ from gtp.evaluation import plot_attribution_graph, test
 from gtp.logger import Logger
 from gtp.models.net import SoyBeanNet
 from gtp.models.scheduler import Scheduler
-from gtp.tools import profile_exe_time
+from gtp.tools import calc_pvalue_linear, filter_topk_snps, profile_exe_time
 from gtp.trainers.trackers import DNATrainingTracker
 from gtp.trainers.training_loops import BasicTrainingLoop
 
@@ -336,6 +336,45 @@ def test(tr_dloader, val_dloader, test_dloader, model):
     return rmses
 
 
+def plot_pvalue_filtering(test_pts, test_dataset, logger):
+    top_k_idx = filter_topk_snps(test_pts, k=200)
+    print(len(top_k_idx))
+
+    pvals = calc_pvalue_linear(
+        np.take(test_dataset.genotype_data, indices=top_k_idx, axis=1),
+        test_dataset.phenotype_data[:, 0],
+    )
+    all_pvals = np.ones(len(test_pts))
+    all_pvals[top_k_idx] = pvals
+
+    plt.figure(figsize=(20, 10))
+    ax = plt.subplot()
+    ax.set_title("SNP values")
+    ax.set_ylabel("-log(p_value)")
+    FONT_SIZE = 16
+    plt.rc("font", size=FONT_SIZE)  # fontsize of the text sizes
+    plt.rc("axes", titlesize=FONT_SIZE)  # fontsize of the axes title
+    plt.rc("axes", labelsize=FONT_SIZE)  # fontsize of the x and y labels
+    plt.rc("legend", fontsize=FONT_SIZE - 4)  # fontsize of the legend
+
+    print("Plotting")
+    y = -np.log(all_pvals)
+    ax.scatter(
+        np.arange(len(test_pts)),
+        y,
+        alpha=0.8,
+        color="#eb5e7c",
+    )
+    ax.axhline(y=-np.log(1e-8), color="red")
+    ax.axhline(y=-np.log(1e-5), color="orange")
+    ax.axhline(y=-np.log(0.05 / len(all_pvals)), color="green")
+    print("End Plotting")
+    # ax.autoscale_view()
+    plt.tight_layout()
+    plt.savefig(os.path.join(logger.outdir, "topk_threshold_pvalues.png"))
+    plt.close()
+
+
 if __name__ == "__main__":
     args, logger, train_data, val_data, test_data = setup()
 
@@ -381,7 +420,7 @@ if __name__ == "__main__":
 
     start_t = time.perf_counter()
     logger.log("Beginning attribution")
-    plot_attribution_graph(
+    tr_pts, val_pts, test_pts = plot_attribution_graph(
         model,
         train_dataloader,
         val_dataloader,
@@ -392,6 +431,9 @@ if __name__ == "__main__":
         ignore_plot=True,
         use_new=True,
     )
+
+    plot_pvalue_filtering(test_pts, test_dataset, logger)
+
     end_t = time.perf_counter()
     total_duration = end_t - start_t
     logger.log(f"Total attribution time: {total_duration:.2f}s")
