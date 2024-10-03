@@ -46,4 +46,4 @@ def filter_topk_snps(scores, k=200):
         k (int, optional): Number of top snps to return indicies for. Defaults to 200.
     """
     sorted_scores = np.argsort(scores)
-    return sorted_scores[::-k]
+    return sorted_scores[-k:]
