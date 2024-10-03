@@ -18,6 +18,9 @@ from gtp.evaluation import plot_attribution_graph, test
 from gtp.logger import Logger
 from gtp.models.net import SoyBeanNet
 from gtp.models.scheduler import Scheduler
+from gtp.tools import profile_exe_time
+from gtp.trainers.trackers import DNATrainingTracker
+from gtp.trainers.training_loops import BasicTrainingLoop
 
 
 def get_optimizer(args, params):
@@ -71,8 +74,6 @@ def forward_step(model, batch, optimizer, is_train=True, return_diff=False):
 
 
 def train(args, tr_dloader, val_dloader, model, logger):
-    # optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
-    # optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     optimizer = get_optimizer(args, model.parameters())
     scheduler = Scheduler(args, optimizer)
 
@@ -82,31 +83,45 @@ def train(args, tr_dloader, val_dloader, model, logger):
     train_losses = []
     val_losses = []
     val_pearsons = []
+    training_loop = BasicTrainingLoop(options=None)
+    training_tracker = DNATrainingTracker()
     for epoch in tqdm(range(args.epochs), desc="Training", colour="green"):
         # Training
-        total_rmse = 0
-        for batch in tr_dloader:
-            mse, rmse = forward_step(model, batch, optimizer, is_train=True)
-            total_rmse += rmse
+        model.train()
+        training_loop.train(
+            tr_dloader,
+            model=lambda batch: model(batch[0].cuda()),
+            loss_fn=lambda output, batch: F.mse_loss(batch[1].cuda(), output),
+            optimizer=optimizer,
+            tracker=training_tracker,
+        )
         scheduler.step()
 
+        total_rmse = sum(training_tracker.data_storage["training_rmse"])
         avg_train_rmse = total_rmse / len(tr_dloader)
 
         # Validation
         total_rmse = 0
         best_diff_e = 99999
         worst_diff_e = -99999
-        for batch in val_dataloader:
-            mse, rmse, best_diff, worst_diff = forward_step(
-                model, batch, None, is_train=False, return_diff=True
-            )
-            best_diff_e = min(best_diff_e, best_diff)
-            worst_diff_e = max(worst_diff_e, worst_diff)
-            total_rmse += rmse
+        model.eval()
+        training_loop.test(
+            val_dloader,
+            model=lambda batch: model(batch[0].cuda()),
+            loss_fn=lambda output, batch: F.mse_loss(batch[1].cuda(), output),
+            tracker=training_tracker,
+        )
 
+        total_rmse = sum(training_tracker.data_storage["testing_rmse"])
         avg_val_rmse = total_rmse / len(val_dloader)
 
-        pearson_stat, pval = calc_pearson_correlation(model, val_dataloader)
+        training_tracker.reset_data_storage()
+
+        # TODO: calc best and worst error difference (between pca and prediction)
+        best_diff_e = 0  # min(best_diff_e, best_diff)
+        worst_diff_e = 0  # max(worst_diff_e, worst_diff)
+
+        pearson_stat, pval = calc_pearson_correlation(model, val_dloader)
 
         if args.save_stat == "loss" and avg_val_rmse <= best_err:
             logger.log("Saving Model")
@@ -203,6 +218,7 @@ def plot_loss_curves(train_losses, val_losses, outdir):
     plt.close()
 
 
+@profile_exe_time
 def load_data(args):
     """
     NOTE: There are missing camids from either pheno or geno type data
@@ -286,6 +302,7 @@ def log_data_splits(train_split, val_split, test_split, logger):
             f.write(out_str)
 
 
+@profile_exe_time
 def setup():
     args = get_args()
 
