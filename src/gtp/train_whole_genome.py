@@ -336,8 +336,8 @@ def test(tr_dloader, val_dloader, test_dloader, model):
     return rmses
 
 
-def plot_pvalue_filtering(test_pts, test_dataset, logger):
-    top_k_idx = filter_topk_snps(test_pts, k=200)
+def plot_pvalue_filtering(test_pts, test_dataset, logger, prefix="", k=200):
+    top_k_idx = filter_topk_snps(test_pts, k=k)
     print(len(top_k_idx))
 
     pvals = calc_pvalue_linear(
@@ -368,10 +368,13 @@ def plot_pvalue_filtering(test_pts, test_dataset, logger):
     ax.axhline(y=-np.log(1e-8), color="red")
     ax.axhline(y=-np.log(1e-5), color="orange")
     ax.axhline(y=-np.log(0.05 / len(all_pvals)), color="green")
+    ax.axhline(y=-np.log(0.05 / k), color="blue")
     print("End Plotting")
     # ax.autoscale_view()
     plt.tight_layout()
-    plt.savefig(os.path.join(logger.outdir, "topk_threshold_pvalues.png"))
+    if prefix != "":
+        prefix = f"{prefix}_"
+    plt.savefig(os.path.join(logger.outdir, f"{prefix}topk_threshold_pvalues.png"))
     plt.close()
 
 
@@ -420,19 +423,20 @@ if __name__ == "__main__":
 
     start_t = time.perf_counter()
     logger.log("Beginning attribution")
-    tr_pts, val_pts, test_pts = plot_attribution_graph(
-        model,
-        train_dataloader,
-        val_dataloader,
-        test_dataloader,
-        logger.outdir,
-        ignore_train=True,
-        mode="cam",
-        ignore_plot=True,
-        use_new=True,
-    )
+    for att_method in ["cam", "lrp"]:
+        tr_pts, val_pts, test_pts = plot_attribution_graph(
+            model,
+            train_dataloader,
+            val_dataloader,
+            test_dataloader,
+            logger.outdir,
+            ignore_train=True,
+            mode=att_method,
+            ignore_plot=True,
+            use_new=True,
+        )
 
-    plot_pvalue_filtering(test_pts, test_dataset, logger)
+        plot_pvalue_filtering(test_pts, test_dataset, logger, prefix=att_method, k=2000)
 
     end_t = time.perf_counter()
     total_duration = end_t - start_t

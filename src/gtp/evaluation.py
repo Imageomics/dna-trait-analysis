@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from captum.attr import GuidedGradCam, Occlusion, Saliency, ShapleyValueSampling
+from captum.attr import LRP, GuidedGradCam, Occlusion, Saliency, ShapleyValueSampling
 from scipy.stats import pearsonr
 from tqdm import tqdm
 
@@ -86,7 +86,7 @@ def get_attribution_points(model, dloader, target=0):
     attr_total = None
     for i, batch in enumerate(dloader):
         model.zero_grad()
-        name, data, pca = batch
+        data, pca = batch
         attr = att_model.attribute(
             data.cuda(),
             target=target,
@@ -133,6 +133,27 @@ def get_shapley_sampling_attr(m, dloader, target=0, n_samples=200, n_windows=100
         else:
             attr_total += attr
 
+    return attr_total
+
+
+def get_lrp_attr(m, dloader, target=0):
+    att_model = LRP(m)
+    attr_total = None
+    for i, batch in enumerate(dloader):
+        m.zero_grad()
+        data, pca = batch
+        attr = att_model.attribute(data.cuda(), target=target)
+        attr = attr.mean(-1)
+        attr = attr[:, 0]  # Only has 1 channel, just extract it
+        attr = attr.detach().cpu().numpy()
+        attr = np.abs(attr).mean(0)  # Sum across batch...Should we be summing here???
+
+        if attr_total is None:
+            attr_total = attr
+        else:
+            attr_total += attr
+
+    # attr_total = attr_total / np.linalg.norm(attr_total, ord=1) # Normalize
     return attr_total
 
 
@@ -217,10 +238,15 @@ def plot_attribution_graph(
         elif mode == "occlusion":
             with torch.no_grad():
                 attr_total = get_attribution_points(model, dloader)
+        elif mode == "lrp":
+            attr_total = get_lrp_attr(model, dloader)
         else:
             raise NotImplementedError(
                 f"Attribution mode ({mode}) has not been implemented"
             )
+
+        # TODO: need to implement the moving window as in the deepcombi paper
+
         all_att_pts.append(attr_total)
         if not ignore_plot:
             for i in range(2):
