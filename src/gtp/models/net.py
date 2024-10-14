@@ -7,25 +7,18 @@ def calc_output_shape(
     kernel_shape,
     padding_shape=(0, 0),
     stride_shape=(1, 1),
-    dialization_shape=(1, 1),
+    dialation_shape=(1, 1),
 ):
-    h_out = (
-        in_shape[0]
-        + 2 * padding_shape[0]
-        - dialization_shape[0] * (kernel_shape[0] - 1)
-        - 1
-    )
-    h_out /= stride_shape[0]
-    h_out = torch.floor(h_out + 1)
+    def get_out_size(idx):
+        out_size = in_shape[idx] + 2 * padding_shape[idx]
+        out_size -= dialation_shape[idx] * (kernel_shape[idx] - 1)
+        out_size -= 1
+        out_size /= stride_shape[idx]
+        out_size = torch.floor(out_size + 1)
+        return out_size
 
-    w_out = (
-        in_shape[1]
-        + 2 * padding_shape[1]
-        - dialization_shape[1] * (kernel_shape[1] - 1)
-        - 1
-    )
-    w_out /= stride_shape[1]
-    w_out = torch.floor(w_out + 1)
+    h_out = get_out_size(0)
+    w_out = get_out_size(1)
 
     return h_out, w_out
 
