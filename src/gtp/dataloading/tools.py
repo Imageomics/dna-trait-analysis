@@ -2,8 +2,10 @@ import os
 from collections import defaultdict
 
 import numpy as np
+import pandas as pd
 
 
+# Deprecate soon
 def align_data(dna_data, dna_camids, pheno_data):
     # Remove Extra DNA data
     idx_to_rm = []
@@ -74,6 +76,128 @@ def collect_chromosome(root, species, chromosome):
             compiled = sorted_data
 
     return final_camids, compiled
+
+
+def load_phenotype_data(phenotype_folder, species, wing, color):
+    """Loads phenotype data for Heliconius butterflies (Erato & Melpomene)
+
+    Args:
+        phenotype_folder (_type_): path to phenotype folder
+        species (_type_): species to collect (erato or melpomene)
+        wing (_type_): which wingside traits to collect (forewings or hindwings)
+        color (_type_): which color traits to collect (color_1, color_2, color_3, total)
+
+    Returns:
+        _type_: a list of camids for the specimens and the phenotype data
+    """
+    pca_path = os.path.join(phenotype_folder, f"{species}_{wing}_{color}", "data.csv")
+    pca_df = pd.read_csv(pca_path)
+    pca_camids = pca_df.camid.to_numpy()
+    pca_data = pca_df.iloc[:, 1:].to_numpy()  # ignore the camid column
+
+    return pca_camids, pca_data
+
+
+def align_genotype_and_phenotype_data(
+    phenotype_camids, genotype_camids, phenotype_data, genotype_data
+):
+    """Aligns genotype and phenotype data by their camids since they aren't a perfect match originally.
+
+    Args:
+        phenotype_camids (np.ndarray): camids of the phenotype data (must be aligned with the phenotype data)
+        genotype_camids (np.ndarray): camids of the genotype data (must be aligned with the genotype data)
+        phenotype_data (np.ndarray): Phenotype data
+        genotype_data (np.ndarray): Genotype data
+
+    Returns:
+        _type_: Aligned phenotype_data, genotype_data, camids
+    """
+    conflict_camid_a = list(
+        set.difference(set(phenotype_camids.tolist()), set(genotype_camids.tolist()))
+    )
+    conflict_camid_b = list(
+        set.difference(set(genotype_camids.tolist()), set(phenotype_camids.tolist()))
+    )
+    conflict_camids = conflict_camid_a + conflict_camid_b
+
+    idx = np.isin(genotype_camids, conflict_camids)
+    genotype_camids_aligned = genotype_camids[~idx]
+    genotype_data_aligned = genotype_data[~idx]
+
+    idx = np.isin(phenotype_camids, conflict_camids)
+    phenotype_camids_aligned = phenotype_camids[~idx]
+    phenotype_data_aligned = phenotype_data[~idx]
+
+    assert (
+        phenotype_camids_aligned == genotype_camids_aligned
+    ).all(), "Invalid alignment"
+
+    return phenotype_data_aligned, genotype_data_aligned, genotype_camids_aligned
+
+
+def load_chromosome_data(
+    genotype_folder, phenotype_folder, species, wing, color, chromosome
+):
+    """
+    NOTE: There are missing camids from either pheno or geno type data
+    Seems to consistently be 1 missing from melpomene genotype
+    and 4 missing from erato phenotype
+    """
+
+    # Collect phenotype data
+    pca_camids, pca_data = load_phenotype_data(phenotype_folder, species, wing, color)
+
+    # Collect genotype data
+    genotype_camids, genotype_data = collect_chromosome(
+        genotype_folder, species, chromosome
+    )
+
+    # Align data
+    phenotype_data_aligned, genotype_data_aligned, camids_aligned = (
+        align_genotype_and_phenotype_data(
+            pca_camids, genotype_camids, pca_data, genotype_data
+        )
+    )
+
+    return camids_aligned, genotype_data_aligned, phenotype_data_aligned
+
+
+def split_data_by_file(
+    genotype_data, phenotype_data, camids, split_data_folder, species
+):
+    """Takes the loaded data and splits into train, val, test according to file by camid
+
+    Args:
+        genotype_data (_type_): Genotype data
+        phenotype_data (_type_): Phenotype data
+        camids (_type_): list of aligned camids with genotype and phenotype data
+        split_data_folder (_type_): path to folder with data split file
+        species (_type_): butterfly species (erato or melpomene)
+
+    Returns:
+        _type_: train, val, and test splits with genotype and phenotype data
+    """
+    train_cams = np.load(os.path.join(split_data_folder, f"{species}_train.npy"))
+    val_cams = np.load(os.path.join(split_data_folder, f"{species}_val.npy"))
+    test_cams = np.load(os.path.join(split_data_folder, f"{species}_test.npy"))
+
+    train_idx = np.isin(camids, train_cams)
+    train_phenotype_data = phenotype_data[train_idx]
+    train_geno_data = genotype_data[train_idx]
+
+    val_idx = np.isin(camids, val_cams)
+    val_phenotype_data = phenotype_data[val_idx]
+    val_geno_data = genotype_data[val_idx]
+
+    test_idx = np.isin(camids, test_cams)
+    test_phenotype_data = phenotype_data[test_idx]
+    test_geno_data = genotype_data[test_idx]
+
+    return (
+        [train_geno_data, train_phenotype_data],
+        [val_geno_data, val_phenotype_data],
+        [test_geno_data, test_phenotype_data],
+    )
 
 
 def butterfly_states_to_ml_ready(df):

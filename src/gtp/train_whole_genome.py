@@ -5,7 +5,6 @@ from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import torch
 import torch.nn.functional as F
 from scipy.stats import pearsonr
@@ -13,7 +12,10 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from gtp.dataloading.datasets import GTP_Dataset
-from gtp.dataloading.tools import collect_chromosome
+from gtp.dataloading.tools import (
+    load_chromosome_data,
+    split_data_by_file,
+)
 from gtp.evaluation import plot_attribution_graph, test
 from gtp.logger import Logger
 from gtp.models.net import SoyBeanNet
@@ -220,71 +222,30 @@ def plot_loss_curves(train_losses, val_losses, outdir):
 
 @profile_exe_time
 def load_data(args):
-    """
-    NOTE: There are missing camids from either pheno or geno type data
-    Seems to consistently be 1 missing from melpomene genotype
-    and 4 missing from erato phenotype
-    """
-    pca_path = os.path.join(
-        args.phenotype_folder, f"{args.species}_{args.wing}_{args.color}", "data.csv"
-    )
-    pca_df = pd.read_csv(pca_path)
-    pca_camids = pca_df.camid.to_numpy()
-
-    sort_idx = np.argsort(pca_camids)
-    pca_camids_sorted = pca_camids[sort_idx]
-
-    pca_data = pca_df.iloc[
-        :, (1 + args.out_dims_start_idx) : (1 + args.out_dims_start_idx + args.out_dims)
-    ].to_numpy()
-    pca_data = pca_data[sort_idx]
-
-    sorted_camids, compiled_data = collect_chromosome(
-        args.genome_folder, args.species, args.chromosome
-    )
-    conflict_camid_a = list(
-        set.difference(set(pca_camids_sorted.tolist()), set(sorted_camids.tolist()))
-    )
-    conflict_camid_b = list(
-        set.difference(set(sorted_camids.tolist()), set(pca_camids_sorted.tolist()))
-    )
-    conflict_camids = conflict_camid_a + conflict_camid_b
-
-    idx = np.isin(sorted_camids, conflict_camids)
-    sorted_camids = sorted_camids[~idx]
-    compiled_data = compiled_data[~idx]
-
-    idx = np.isin(pca_camids_sorted, conflict_camids)
-    pca_camids_sorted = pca_camids_sorted[~idx]
-    pca_data = pca_data[~idx]
-
-    assert (pca_camids_sorted == sorted_camids).all(), "Invalid alignment"
-
-    train_cams = np.load(
-        os.path.join(args.split_data_folder, f"{args.species}_train.npy")
-    )
-    val_cams = np.load(os.path.join(args.split_data_folder, f"{args.species}_val.npy"))
-    test_cams = np.load(
-        os.path.join(args.split_data_folder, f"{args.species}_test.npy")
+    camids_aligned, genotype_data_aligned, phenotype_data_aligned = (
+        load_chromosome_data(
+            args.genome_folder,
+            args.phenotype_folder,
+            args.species,
+            args.wing,
+            args.color,
+            args.chromosome,
+        )
     )
 
-    train_idx = np.isin(sorted_camids, train_cams)
-    train_pca_data = pca_data[train_idx]
-    train_geno_data = compiled_data[train_idx]
+    phenotype_data_aligned = phenotype_data_aligned[
+        :, args.out_dims_start_idx : args.out_dims_start_idx + args.out_dims
+    ]
 
-    val_idx = np.isin(sorted_camids, val_cams)
-    val_pca_data = pca_data[val_idx]
-    val_geno_data = compiled_data[val_idx]
-
-    test_idx = np.isin(sorted_camids, test_cams)
-    test_pca_data = pca_data[test_idx]
-    test_geno_data = compiled_data[test_idx]
-
-    return (
-        [train_geno_data, train_pca_data],
-        [val_geno_data, val_pca_data],
-        [test_geno_data, test_pca_data],
+    train_split, val_split, test_split = split_data_by_file(
+        genotype_data_aligned,
+        phenotype_data_aligned,
+        camids_aligned,
+        args.split_data_folder,
+        args.species,
     )
+
+    return train_split, val_split, test_split
 
 
 def log_data_splits(train_split, val_split, test_split, logger):
@@ -360,8 +321,8 @@ def plot_pvalue_filtering(test_pts, test_dataset, logger, prefix="", k=200):
     print("Plotting")
     y = -np.log(all_pvals)
     ax.scatter(
-        np.arange(len(test_pts)),
-        y,
+        np.arange(len(test_pts))[top_k_idx],
+        y[top_k_idx],
         alpha=0.8,
         color="#eb5e7c",
     )
