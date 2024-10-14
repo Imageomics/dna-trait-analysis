@@ -1,7 +1,44 @@
+import torch
 import torch.nn as nn
 
+
+def calc_output_shape(
+    in_shape,
+    kernel_shape,
+    padding_shape=(0, 0),
+    stride_shape=(1, 1),
+    dialization_shape=(1, 1),
+):
+    h_out = (
+        in_shape[0]
+        + 2 * padding_shape[0]
+        - dialization_shape[0] * (kernel_shape[0] - 1)
+        - 1
+    )
+    h_out /= stride_shape[0]
+    h_out = torch.floor(h_out + 1)
+
+    w_out = (
+        in_shape[1]
+        + 2 * padding_shape[1]
+        - dialization_shape[1] * (kernel_shape[1] - 1)
+        - 1
+    )
+    w_out /= stride_shape[1]
+    w_out = torch.floor(w_out + 1)
+
+    return h_out, w_out
+
+
 class ResBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, inner_channels=None, kernel_size=3, dropout=False):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        inner_channels=None,
+        kernel_size=3,
+        dropout=False,
+    ):
         super().__init__()
 
         if inner_channels is None:
@@ -11,18 +48,30 @@ class ResBlock(nn.Module):
             self.skip = nn.Conv2d(in_channels, out_channels, 1)
         else:
             self.skip = nn.Identity()
-        
+
         if dropout:
             self.dropout_module = nn.Dropout(0.75)
         else:
             self.dropout_module = nn.Identity()
-        
+
         self.block = nn.Sequential(
-            nn.Conv2d(in_channels, inner_channels, kernel_size=(kernel_size, 1), stride=1, padding='same'),
+            nn.Conv2d(
+                in_channels,
+                inner_channels,
+                kernel_size=(kernel_size, 1),
+                stride=1,
+                padding="same",
+            ),
             nn.BatchNorm2d(inner_channels),
-            nn.Conv2d(inner_channels, out_channels, kernel_size=(kernel_size, 1), stride=1, padding='same'),
+            nn.Conv2d(
+                inner_channels,
+                out_channels,
+                kernel_size=(kernel_size, 1),
+                stride=1,
+                padding="same",
+            ),
             nn.BatchNorm2d(out_channels),
-            nn.LeakyReLU(0.2)
+            nn.LeakyReLU(0.2),
         )
 
     def forward(self, x):
@@ -30,6 +79,7 @@ class ResBlock(nn.Module):
         h = self.block(x)
         sc = self.skip(x)
         return h + sc
+
 
 class LargeNet(nn.Module):
     def __init__(self, num_out_dims=10):
@@ -41,14 +91,14 @@ class LargeNet(nn.Module):
         pool_stride = 16
 
         self.block1 = ResBlock(4, 8, kernel_size=20, dropout=False)
-        self.pool1 = nn.AvgPool2d((pool_stride,1), stride=(pool_stride,1), padding=0)
+        self.pool1 = nn.AvgPool2d((pool_stride, 1), stride=(pool_stride, 1), padding=0)
         self.block2 = ResBlock(8, 8, kernel_size=20, dropout=False)
-        self.pool2 = nn.MaxPool2d((pool_stride,1), stride=(pool_stride,1), padding=0)
+        self.pool2 = nn.MaxPool2d((pool_stride, 1), stride=(pool_stride, 1), padding=0)
         self.block3 = ResBlock(8, 16, kernel_size=20, dropout=False)
-        self.pool3 = nn.MaxPool2d((pool_stride,1), stride=(pool_stride,1), padding=0)
+        self.pool3 = nn.MaxPool2d((pool_stride, 1), stride=(pool_stride, 1), padding=0)
         self.block4 = ResBlock(16, 16, kernel_size=20, dropout=False)
 
-        self.dropout_module = nn.Identity()#nn.Dropout(0.75)
+        self.dropout_module = nn.Identity()  # nn.Dropout(0.75)
 
         out_size = (20, 1)
         self.adpt_avg_pool = nn.AdaptiveAvgPool2d(out_size)
@@ -70,19 +120,75 @@ class LargeNet(nn.Module):
         x = self.adpt_avg_pool(x)
         x = self.dropout_module(x)
         x = x.view(x.shape[0], -1)
-        #print(x.shape)
+        # print(x.shape)
         x = self.fc(x)
         return x
 
 
+class SoyBeanNetDeep(nn.Module):
+    def __init__(
+        self,
+        window_size=200,
+        num_out_dims=10,
+        insize=4,
+        hidden_dim=10,
+        drop_out_prob=0.75,
+    ):
+        super().__init__()
+
+        self.block = nn.Sequential(
+            nn.Conv2d(1, hidden_dim, kernel_size=(4, insize), padding=0, stride=1),
+            nn.Tanh(),
+            nn.Conv2d(
+                hidden_dim, hidden_dim, kernel_size=(20, 1), padding="same", stride=1
+            ),
+            nn.Tanh(),
+        )
+        self.dropout_block = nn.Dropout(drop_out_prob)
+
+        self.shortcut = nn.Sequential(
+            nn.Conv2d(1, hidden_dim, kernel_size=(4, insize), padding=0, stride=1),
+            nn.Tanh(),
+        )
+
+        self.last_block = nn.Sequential(
+            nn.Conv2d(
+                hidden_dim, hidden_dim, kernel_size=(4, 1), padding="same", stride=1
+            )
+        )
+
+        self.dropout_last_block = nn.Dropout(drop_out_prob)
+
+        num_features = (window_size - 3) * hidden_dim
+        self.fc = nn.Linear(num_features, num_out_dims)
+
+    def forward(self, x):
+        h = self.block(x)
+        h = self.dropout_block(h)
+        sc = self.shortcut(x)
+        h = self.last_block(h + sc)
+        h = self.dropout_last_block(h)
+        h = h.view(h.shape[0], -1)
+        return self.fc(h)
+
+
 class SoyBeanNet(nn.Module):
-    def __init__(self, window_size=200, num_out_dims=10, insize=4, hidden_dim=10, drop_out_prob=0.75):
+    def __init__(
+        self,
+        window_size=200,
+        num_out_dims=10,
+        insize=4,
+        hidden_dim=10,
+        drop_out_prob=0.75,
+    ):
         super().__init__()
 
         self.block = nn.Sequential(
             nn.Conv2d(1, hidden_dim, kernel_size=(4, insize), padding=0, stride=1),
             nn.Tanh(),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(20, 1), padding='same', stride=1), 
+            nn.Conv2d(
+                hidden_dim, hidden_dim, kernel_size=(20, 1), padding="same", stride=1
+            ),
             nn.Tanh(),
         )
         self.dropout_block = nn.Dropout(drop_out_prob)
@@ -93,31 +199,43 @@ class SoyBeanNet(nn.Module):
         )
 
         self.last_block = nn.Sequential(
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(4, 1), padding='same', stride=1)
+            nn.Conv2d(
+                hidden_dim, hidden_dim, kernel_size=(4, 1), padding="same", stride=1
+            )
         )
 
         self.dropout_last_block = nn.Dropout(drop_out_prob)
 
-        num_features = (window_size-3) * hidden_dim
+        num_features = (window_size - 3) * hidden_dim
         self.fc = nn.Linear(num_features, num_out_dims)
 
     def forward(self, x):
         h = self.block(x)
         h = self.dropout_block(h)
         sc = self.shortcut(x)
-        h = self.last_block(h+sc)
+        h = self.last_block(h + sc)
         h = self.dropout_last_block(h)
         h = h.view(h.shape[0], -1)
         return self.fc(h)
-    
+
+
 class SoyBeanNetLarge(nn.Module):
-    def __init__(self, window_size=200, num_out_dims=10, insize=4, hidden_dim=10, drop_out_prob=0.75):
+    def __init__(
+        self,
+        window_size=200,
+        num_out_dims=10,
+        insize=4,
+        hidden_dim=10,
+        drop_out_prob=0.75,
+    ):
         super().__init__()
 
         self.block = nn.Sequential(
             nn.Conv2d(1, hidden_dim, kernel_size=(4, insize), padding=0, stride=1),
             nn.Tanh(),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(20, 1), padding='same', stride=1), 
+            nn.Conv2d(
+                hidden_dim, hidden_dim, kernel_size=(20, 1), padding="same", stride=1
+            ),
             nn.Tanh(),
         )
         self.dropout_block = nn.Dropout(drop_out_prob)
@@ -128,26 +246,33 @@ class SoyBeanNetLarge(nn.Module):
         )
 
         self.last_block = nn.Sequential(
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(4, 1), padding='same', stride=1),
+            nn.Conv2d(
+                hidden_dim, hidden_dim, kernel_size=(4, 1), padding="same", stride=1
+            ),
             nn.ReLU(),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(4, 1), padding='same', stride=1),
+            nn.Conv2d(
+                hidden_dim, hidden_dim, kernel_size=(4, 1), padding="same", stride=1
+            ),
             nn.ReLU(),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=(4, 1), padding='same', stride=1)
+            nn.Conv2d(
+                hidden_dim, hidden_dim, kernel_size=(4, 1), padding="same", stride=1
+            ),
         )
 
         self.dropout_last_block = nn.Dropout(drop_out_prob)
 
-        num_features = (window_size-3) * hidden_dim
+        num_features = (window_size - 3) * hidden_dim
         self.fc = nn.Linear(num_features, num_out_dims)
 
     def forward(self, x):
         h = self.block(x)
         h = self.dropout_block(h)
         sc = self.shortcut(x)
-        h = self.last_block(h+sc)
+        h = self.last_block(h + sc)
         h = self.dropout_last_block(h)
         h = h.view(h.shape[0], -1)
         return self.fc(h)
+
 
 class ConvNet(nn.Module):
     def __init__(self, num_out_dims=10):
@@ -157,18 +282,18 @@ class ConvNet(nn.Module):
             nn.Conv2d(1, 8, kernel_size=3, padding=0, stride=1),
             nn.LeakyReLU(0.2),
             nn.MaxPool2d((2, 1), stride=(2, 1), padding=0),
-            nn.Conv2d(8, 8, kernel_size=(4,1), padding=0, stride=1),
+            nn.Conv2d(8, 8, kernel_size=(4, 1), padding=0, stride=1),
             nn.LeakyReLU(0.2),
-            nn.MaxPool2d((2, 1), stride=(2, 1), padding=0)
+            nn.MaxPool2d((2, 1), stride=(2, 1), padding=0),
         )
-        
+
         self.block2 = nn.Sequential(
             nn.Conv2d(8, 16, kernel_size=(4, 1), padding=0, stride=1),
             nn.LeakyReLU(0.2),
             nn.MaxPool2d((2, 1), stride=(2, 1), padding=0),
             nn.Conv2d(16, 16, kernel_size=(4, 1), padding=0, stride=1),
             nn.LeakyReLU(0.2),
-            nn.MaxPool2d((2, 1), stride=(2, 1), padding=0)
+            nn.MaxPool2d((2, 1), stride=(2, 1), padding=0),
         )
 
         self.block3 = nn.Sequential(
@@ -177,28 +302,28 @@ class ConvNet(nn.Module):
             nn.MaxPool2d((2, 1), stride=(2, 1), padding=0),
             nn.Conv2d(16, 16, kernel_size=(4, 1), padding=0, stride=1),
             nn.LeakyReLU(0.2),
-            nn.MaxPool2d((2, 1), stride=(2, 1), padding=0)
+            nn.MaxPool2d((2, 1), stride=(2, 1), padding=0),
         )
-        
+
         self.block4 = nn.Sequential(
             nn.Conv2d(16, 16, kernel_size=(4, 1), padding=0, stride=1),
             nn.LeakyReLU(0.2),
             nn.MaxPool2d((2, 1), stride=(2, 1), padding=0),
             nn.Conv2d(16, 16, kernel_size=(4, 1), padding=0, stride=1),
             nn.LeakyReLU(0.2),
-            nn.MaxPool2d((2, 1), stride=(2, 1), padding=0)
+            nn.MaxPool2d((2, 1), stride=(2, 1), padding=0),
         )
-        
+
         self.block5 = nn.Sequential(
             nn.Conv2d(16, 16, kernel_size=(4, 1), padding=0, stride=1),
             nn.LeakyReLU(0.2),
             nn.MaxPool2d((2, 1), stride=(2, 1), padding=0),
             nn.Conv2d(16, 16, kernel_size=(4, 1), padding=0, stride=1),
             nn.LeakyReLU(0.2),
-            nn.MaxPool2d((2, 1), stride=(2, 1), padding=0)
+            nn.MaxPool2d((2, 1), stride=(2, 1), padding=0),
         )
 
-        self.fc = nn.Linear(3392//4, num_out_dims)
+        self.fc = nn.Linear(3392 // 4, num_out_dims)
 
     def forward(self, x):
         x = self.block1(x)
@@ -207,6 +332,6 @@ class ConvNet(nn.Module):
         x = self.block4(x)
         x = self.block5(x)
         x = x.view(len(x), -1)
-        #print(x.shape)
+        # print(x.shape)
         x = self.fc(x)
         return x
