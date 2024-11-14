@@ -2,6 +2,7 @@ import copy
 import os
 import time
 from argparse import ArgumentParser
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -189,6 +190,10 @@ def get_args():
         default="/home/carlyn.1/dna-trait-analysis/data",
     )
     parser.add_argument("--chromosome", type=int, default=1)
+    parser.add_argument(
+        "--top_k_chromosome_training", action="store_true", default=False
+    )
+    parser.add_argument("--top_k_chromosome_training_path", type=str, default=False)
     parser.add_argument("--color", type=str, default="total")
     parser.add_argument("--wing", type=str, default="forewings")
     parser.add_argument("--exp_name", type=str, default="debug")
@@ -268,6 +273,8 @@ def setup():
     args = get_args()
 
     exp_name = f"{args.species}_{args.wing}_{args.color}_chromosome_{args.chromosome}"
+    if args.top_k_chromosome_training:
+        exp_name = f"{args.species}_{args.wing}_{args.color}_top_k_snps"
 
     logger = Logger(args, exp_name=exp_name)
 
@@ -278,7 +285,68 @@ def setup():
     Color: {args.color}
     """)
 
-    train_data, val_data, test_data = load_data(args)
+    if args.top_k_chromosome_training:
+
+        def load_one(args, chromosome, snp_idx, idx):
+            cur_args = copy.deepcopy(args)
+            cur_args.chromosome = chromosome
+            train_data, val_data, test_data = load_data(cur_args)
+            snp_idx = np.sort(snp_idx).astype(np.int64)
+            train_data[0] = train_data[0][:, snp_idx]
+            val_data[0] = val_data[0][:, snp_idx]
+            test_data[0] = test_data[0][:, snp_idx]
+            return (
+                idx,
+                train_data,
+                val_data,
+                test_data,
+            )
+
+        futures = []
+        pool = ThreadPoolExecutor(21)
+        final_train_data = None
+        final_val_data = None
+        final_test_data = None
+        data = np.load(args.top_k_chromosome_training_path, allow_pickle=True)
+        test_snp_selections = data.item()["test"]
+        for idx, snp_idx in tqdm(
+            enumerate(test_snp_selections), desc="loading top snps from chromosome"
+        ):
+            future = pool.submit(load_one, args, idx + 1, snp_idx, idx)
+            futures.append(future)
+
+        total = 0
+        all_data = []
+        for future in as_completed(futures):
+            proc_idx, train_data, val_data, test_data = future.result()
+            all_data.append([proc_idx, train_data, val_data, test_data])
+            total += 1
+            print(f"Completed loading on chromosome: {proc_idx+1}: ({total}/21)")
+
+        for proc_idx, train_data, val_data, test_data in sorted(
+            all_data, key=lambda x: int(x[0])
+        ):
+            if final_train_data is None:
+                final_train_data = train_data
+                final_val_data = val_data
+                final_test_data = test_data
+            else:
+                final_train_data[0] = np.concatenate(
+                    (final_train_data[0], train_data[0]), axis=1
+                )
+                final_val_data[0] = np.concatenate(
+                    (final_val_data[0], val_data[0]), axis=1
+                )
+                final_test_data[0] = np.concatenate(
+                    (final_test_data[0], test_data[0]), axis=1
+                )
+                assert (train_data[1] == final_train_data[1]).all()
+                assert (val_data[1] == final_val_data[1]).all()
+                assert (test_data[1] == final_test_data[1]).all()
+
+        return args, logger, final_train_data, final_val_data, final_test_data
+    else:
+        train_data, val_data, test_data = load_data(args)
 
     return args, logger, train_data, val_data, test_data
 
@@ -299,7 +367,6 @@ def test(tr_dloader, val_dloader, test_dloader, model):
 
 def plot_pvalue_filtering(test_pts, test_dataset, logger, prefix="", k=200):
     top_k_idx = filter_topk_snps(test_pts, k=k)
-    print(len(top_k_idx))
 
     pvals = calc_pvalue_linear(
         np.take(test_dataset.genotype_data, indices=top_k_idx, axis=1),
@@ -393,11 +460,14 @@ if __name__ == "__main__":
             logger.outdir,
             ignore_train=True,
             mode=att_method,
-            ignore_plot=True,
+            ignore_plot=False,
             use_new=True,
         )
 
-        plot_pvalue_filtering(test_pts, test_dataset, logger, prefix=att_method, k=2000)
+        k = 2000
+        if args.top_k_chromosome_training:
+            k = num_vcfs
+        plot_pvalue_filtering(test_pts, test_dataset, logger, prefix=att_method, k=-1)
 
     end_t = time.perf_counter()
     total_duration = end_t - start_t

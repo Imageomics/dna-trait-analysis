@@ -31,7 +31,7 @@ def calc_pvalue_linear(snps, y):
         snp_categories = (snps[:, snp].astype(np.uint8) * np.array([0, 1, 2])).sum(1)
         if len(np.unique(snp_categories, return_counts=True)[0]) > 1:
             result = stats.linregress(snp_categories, y)
-            pval = result.pvalue
+            pval = float(result.pvalue)
         else:
             pval = 1.0
         pvals.append(pval)

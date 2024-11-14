@@ -1,4 +1,5 @@
-import torch
+import math
+
 import torch.nn as nn
 
 
@@ -14,7 +15,7 @@ def calc_output_shape(
         out_size -= dialation_shape[idx] * (kernel_shape[idx] - 1)
         out_size -= 1
         out_size /= stride_shape[idx]
-        out_size = torch.floor(out_size + 1)
+        out_size = math.floor(out_size + 1)
         return out_size
 
     h_out = get_out_size(0)
@@ -137,6 +138,19 @@ class SoyBeanNetDeep(nn.Module):
             ),
             nn.Tanh(),
         )
+
+        block_out_size = calc_output_shape(
+            in_shape=(window_size, insize),
+            kernel_shape=(4, insize),
+            padding_shape=(0, 0),
+            stride_shape=(1, 1),
+        )
+        block_out_size = calc_output_shape(
+            in_shape=block_out_size,
+            kernel_shape=(20, insize),
+            padding_shape=(20 - 1, 0),
+            stride_shape=(1, 1),
+        )
         self.dropout_block = nn.Dropout(drop_out_prob)
 
         self.shortcut = nn.Sequential(
@@ -144,15 +158,48 @@ class SoyBeanNetDeep(nn.Module):
             nn.Tanh(),
         )
 
+        shortcut_out_size = calc_output_shape(
+            in_shape=(window_size, insize),
+            kernel_shape=(4, insize),
+            padding_shape=(0, 0),
+            stride_shape=(1, 1),
+        )
+
         self.last_block = nn.Sequential(
             nn.Conv2d(
-                hidden_dim, hidden_dim, kernel_size=(4, 1), padding="same", stride=1
-            )
+                hidden_dim, hidden_dim, kernel_size=(100, 1), padding=0, stride=(100, 1)
+            ),
+            nn.Tanh(),
+            nn.Conv2d(
+                hidden_dim, hidden_dim, kernel_size=(100, 1), padding=0, stride=(100, 1)
+            ),
+            nn.Tanh(),
+            nn.Conv2d(
+                hidden_dim, hidden_dim, kernel_size=(100, 1), padding=0, stride=(100, 1)
+            ),
+        )
+        final_out_size = calc_output_shape(
+            in_shape=shortcut_out_size,
+            kernel_shape=(100, 1),
+            padding_shape=(0, 0),
+            stride_shape=(100, 1),
+        )
+        final_out_size = calc_output_shape(
+            in_shape=final_out_size,
+            kernel_shape=(100, 1),
+            padding_shape=(0, 0),
+            stride_shape=(100, 1),
+        )
+        final_out_size = calc_output_shape(
+            in_shape=final_out_size,
+            kernel_shape=(100, 1),
+            padding_shape=(0, 0),
+            stride_shape=(100, 1),
         )
 
         self.dropout_last_block = nn.Dropout(drop_out_prob)
 
-        num_features = (window_size - 3) * hidden_dim
+        num_features = final_out_size[0] * final_out_size[1] * hidden_dim
         self.fc = nn.Linear(num_features, num_out_dims)
 
     def forward(self, x):
