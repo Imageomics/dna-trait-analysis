@@ -4,6 +4,8 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
+from gtp.tools import profile_exe_time
+
 
 # Deprecate soon
 def align_data(dna_data, dna_camids, pheno_data):
@@ -40,6 +42,7 @@ def align_data(dna_data, dna_camids, pheno_data):
     return dna_data, dna_camids, pheno_data
 
 
+@profile_exe_time
 def collect_chromosome(root, species, chromosome):
     genotype_path_root = os.path.join(root, f"{species}")
     scaffolds = []
@@ -78,6 +81,7 @@ def collect_chromosome(root, species, chromosome):
     return final_camids, compiled
 
 
+@profile_exe_time
 def load_phenotype_data(phenotype_folder, species, wing, color):
     """Loads phenotype data for Heliconius butterflies (Erato & Melpomene)
 
@@ -98,6 +102,7 @@ def load_phenotype_data(phenotype_folder, species, wing, color):
     return pca_camids, pca_data
 
 
+@profile_exe_time
 def align_genotype_and_phenotype_data(
     phenotype_camids, genotype_camids, phenotype_data, genotype_data
 ):
@@ -135,14 +140,19 @@ def align_genotype_and_phenotype_data(
     return phenotype_data_aligned, genotype_data_aligned, genotype_camids_aligned
 
 
+@profile_exe_time
 def load_chromosome_data(
-    genotype_folder, phenotype_folder, species, wing, color, chromosome
+    genotype_folder, phenotype_folder, species, wing, color, chromosome, verbose=False
 ):
     """
     NOTE: There are missing camids from either pheno or geno type data
     Seems to consistently be 1 missing from melpomene genotype
     and 4 missing from erato phenotype
     """
+
+    def print_out(str):
+        if verbose:
+            print(str)
 
     # Collect phenotype data
     pca_camids, pca_data = load_phenotype_data(phenotype_folder, species, wing, color)
