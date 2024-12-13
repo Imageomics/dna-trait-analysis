@@ -1,0 +1,12 @@
+io: # input / output configurations
+    default_root: "/local/scratch/carlyn.1/" # Default root. Used if any 'root' option is null under the 'io' config 
+    raw_data_input: # for the raw data directly downloaded
+        root: null
+        genotype: "dna/vcfs"
+        phenotype: "dna/colors"
+    data_post_process: # where post processed raw data will be
+        root: null
+        genotype: ""
+        phenotype: ""
+dev:
+    tmp: "tmp"
