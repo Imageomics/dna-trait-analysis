@@ -6,10 +6,16 @@ build-backend = "hatchling.build"
 name = "gtp"
 version = "2024.12.13"
 dependencies = [
+"tqdm",
+"click",
+"pytest",
 "torch",
 "torchvision",
 "matplotlib",
 "PyYAML",
+"pandas",
+"pyarrow",
+"scipy",
 "ipykernel",
 ]
 requires-python = "==3.10"

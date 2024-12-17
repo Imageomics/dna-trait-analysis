@@ -11,10 +11,26 @@ pip install -e .
 # Set Options
 To personalize options can either:
     - Change the configurations in `src/gtp/configs/default_configs.yaml`
-    - Copy that file and create a new one. Then update 
+    - Copy that file and create a new one. Then update ```DEFAULT_YAML_CONFIG_PATH``` in ```src/gtp/configs/loaders.py```
+
+# Run Tests
+To run tests, run the follwing command:
+```
+pytest tests
+```
+
+NOTE: these tests depend on the current configs and may need to be adjusted for your development environment.
 
 # Preprocess Data
-Run the notebook in ```notebooks/preprocess_pipeline.ipynb```. You may have to change the input and output directory constants and even the ```DNA_SCOPE``` depending on your task.
+To preprocess the Data, you can either:
+- Run the notebook in ```notebooks/preprocess_pipeline.ipynb```.
+- Or, run the commands:
+```
+python -m gtp.pipelines.preprocess --method phenotype
+python -m gtp.pipelines.preprocess --method genotype
+```
+
+NOTE: preprocessing genotype data takes a long time. You can add the ```num-processes``` argument to the command to help speed this up. 4 by default. Do not be fooled by the initial processing speed as smaller files are processed first.
 
 # Training the Model
 Run the following command:
