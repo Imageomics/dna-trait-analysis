@@ -4,7 +4,7 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-from gtp.tools import profile_exe_time
+from gtp.tools.timing import profile_exe_time
 
 
 # Deprecate soon
@@ -42,7 +42,7 @@ def align_data(dna_data, dna_camids, pheno_data):
     return dna_data, dna_camids, pheno_data
 
 
-@profile_exe_time
+@profile_exe_time(verbose=False)
 def collect_chromosome(root, species, chromosome):
     genotype_path_root = os.path.join(root, f"{species}")
     scaffolds = []
@@ -81,7 +81,7 @@ def collect_chromosome(root, species, chromosome):
     return final_camids, compiled
 
 
-@profile_exe_time
+@profile_exe_time(verbose=False)
 def load_phenotype_data(phenotype_folder, species, wing, color):
     """Loads phenotype data for Heliconius butterflies (Erato & Melpomene)
 
@@ -102,7 +102,7 @@ def load_phenotype_data(phenotype_folder, species, wing, color):
     return pca_camids, pca_data
 
 
-@profile_exe_time
+@profile_exe_time(verbose=False)
 def align_genotype_and_phenotype_data(
     phenotype_camids, genotype_camids, phenotype_data, genotype_data
 ):
@@ -140,7 +140,7 @@ def align_genotype_and_phenotype_data(
     return phenotype_data_aligned, genotype_data_aligned, genotype_camids_aligned
 
 
-@profile_exe_time
+@profile_exe_time(verbose=False)
 def load_chromosome_data(
     genotype_folder, phenotype_folder, species, wing, color, chromosome, verbose=False
 ):

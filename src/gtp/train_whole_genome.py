@@ -21,7 +21,8 @@ from gtp.evaluation import plot_attribution_graph, test
 from gtp.logger import Logger
 from gtp.models.net import SoyBeanNet
 from gtp.models.scheduler import Scheduler
-from gtp.tools import calc_pvalue_linear, filter_topk_snps, profile_exe_time
+from gtp.tools.calculation import calc_pvalue_linear, filter_topk_snps
+from gtp.tools.timing import profile_exe_time
 from gtp.trainers.trackers import DNATrainingTracker
 from gtp.trainers.training_loops import BasicTrainingLoop
 
@@ -225,7 +226,7 @@ def plot_loss_curves(train_losses, val_losses, outdir):
     plt.close()
 
 
-@profile_exe_time
+@profile_exe_time(verbose=False)
 def load_data(args):
     camids_aligned, genotype_data_aligned, phenotype_data_aligned = (
         load_chromosome_data(
@@ -268,7 +269,7 @@ def log_data_splits(train_split, val_split, test_split, logger):
             f.write(out_str)
 
 
-@profile_exe_time
+@profile_exe_time(verbose=False)
 def setup():
     args = get_args()
 
