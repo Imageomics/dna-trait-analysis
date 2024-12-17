@@ -6,7 +6,13 @@ io: # input / output configurations
         phenotype: "dna/colors"
     data_post_process: # where post processed raw data will be
         root: null
-        genotype: ""
-        phenotype: ""
+        genotype: "dna/processed/genotypes"
+        phenotype: "dna/processed/phenotypes"
+global_butterfly_metadata:
+    species: ["erato", "melpomene"]
+    wings: ["forewings", "hindwings"]
+    phenotypes: ["color_1", "color_2", "color_3", "total"]
+experiment:
+    genotype_scope: "genome" # Either 'genome', 'chromosomes', 'genes'
 dev:
     tmp: "tmp"
