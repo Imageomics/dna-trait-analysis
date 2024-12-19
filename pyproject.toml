@@ -16,6 +16,7 @@ dependencies = [
 "pandas",
 "pyarrow",
 "scipy",
+"captum",
 "ipykernel",
 ]
 requires-python = "==3.10"

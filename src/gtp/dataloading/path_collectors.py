@@ -40,3 +40,9 @@ def get_results_training_metadata_directory(io_cfgs: IOConfigs) -> Path:
     root = _select_override_if_exists(io_cfgs.default_root, io_cfgs.results.root)
     path = Path(root, io_cfgs.results.training_metadata)
     return path
+
+
+def get_results_training_output_directory(io_cfgs: IOConfigs) -> Path:
+    root = _select_override_if_exists(io_cfgs.default_root, io_cfgs.results.root)
+    path = Path(root, io_cfgs.results.training_output)
+    return path

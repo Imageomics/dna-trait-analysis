@@ -41,5 +41,18 @@ python -m gtp.pipelines.create_training_splits
 # Training the Model
 Run the following command:
 ```
-python -m gtp.train_whole_genome --chromosome 18 --species erato --color color_3 --wing forewings --epochs 100 --batch_size 32 --exp_name test
+python -m gtp.pipelines.train --chromosome 18 --species erato --color color_3 --wing forewings --epochs 100 --batch_size 32 --exp_name debug
 ```
+
+# Plot and Save Attributions
+To plot and save the attributions of a single chromosome, run the following command:
+```
+# TODO
+```
+
+To plot and save the attributions of the entire genome, run the following command:
+```
+# TODO
+```
+
+NOTE: you have to have trained a model for every chromosome for a species in order for the above command to work.
