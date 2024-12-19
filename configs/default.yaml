@@ -8,11 +8,18 @@ io: # input / output configurations
         root: null
         genotype: "dna/processed/genotypes"
         phenotype: "dna/processed/phenotypes"
+    results:
+        root: null
+        training_metadata: "dna/metadata"
 global_butterfly_metadata:
     species: ["erato", "melpomene"]
     wings: ["forewings", "hindwings"]
     phenotypes: ["color_1", "color_2", "color_3", "total"]
 experiment:
     genotype_scope: "genome" # Either 'genome', 'chromosomes', 'genes'
+training:
+    train_ratio: 0.8
+    validation_ratio: 0.1
+    seed: 2024
 dev:
     tmp: "tmp"

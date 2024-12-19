@@ -32,6 +32,12 @@ python -m gtp.pipelines.preprocess --method genotype
 
 NOTE: preprocessing genotype data takes a long time. You can add the ```num-processes``` argument to the command to help speed this up. 4 by default. Do not be fooled by the initial processing speed as smaller files are processed first.
 
+# Create Data Splits
+To keep data splits consistent across runs, precompute the splits with the following command:
+```
+python -m gtp.pipelines.create_training_splits
+```
+
 # Training the Model
 Run the following command:
 ```
