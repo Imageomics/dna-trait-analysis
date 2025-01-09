@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gtp"
+version = "2024.12.13"
+dependencies = [
+"tqdm",
+"click",
+"pytest",
+"torch",
+"torchvision",
+"matplotlib",
+"PyYAML",
+"pandas",
+"pyarrow",
+"scipy",
+"captum",
+"dash-bio",
+"nbformat",
+"kaleido",
+"ipykernel",
+]
+requires-python = "==3.10"
+authors = []
+maintainers = []
+description = "Genotype-to-Phenotype pipeline"
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = []
+classifiers = [
+"Development Status :: 4 - Beta",
+"Programming Language :: Python"
+]
+
+[project.urls]
+Homepage = "https://github.com/Imageomics/dna-trait-analysis"
+Documentation = ""
+Repository = "https://github.com/Imageomics/dna-trait-analysis"
+"Bug Tracker" = ""
+Changelog = ""
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gtp"]

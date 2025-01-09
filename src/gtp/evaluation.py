@@ -35,12 +35,19 @@ def do_knockout(model, dloader, target=0, out_dims=1):
     return knockout_values
 
 
-def test(tr_dloader, val_dloader, test_dloader, model, out_dims):
+def test(tr_dloader, val_dloader, test_dloader, model, out_dims, out_dims_start_idx=0):
     rmses = []
     for dl in [tr_dloader, val_dloader, test_dloader]:
         total_rmse = 0
         for batch in dl:
-            mse, rmse = forward_step(model, batch, None, out_dims, is_train=False)
+            mse, rmse = forward_step(
+                model,
+                batch,
+                None,
+                out_dims,
+                out_start_idx=out_dims_start_idx,
+                is_train=False,
+            )
             total_rmse += rmse
 
         avg_rmse = total_rmse / len(dl)
@@ -142,6 +149,7 @@ def get_lrp_attr(m, dloader, target=0):
     for i, batch in enumerate(dloader):
         m.zero_grad()
         data, pca = batch
+        data.requires_grad = True
         attr = att_model.attribute(data.cuda(), target=target)
         attr = attr.mean(-1)
         attr = attr[:, 0]  # Only has 1 channel, just extract it

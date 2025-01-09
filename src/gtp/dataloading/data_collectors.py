@@ -1,0 +1,41 @@
+from gtp.configs.project import GenotypeToPhenotypeConfigs
+from gtp.dataloading.path_collectors import (
+    get_post_processed_genotype_directory,
+    get_post_processed_phenotype_directory,
+    get_results_training_metadata_directory,
+)
+from gtp.dataloading.tools import load_chromosome_data, split_data_by_file
+from gtp.options.training import TrainingOptions
+from gtp.tools.timing import profile_exe_time
+
+
+@profile_exe_time(verbose=False)
+def load_training_data(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions):
+    genotype_folder = get_post_processed_genotype_directory(configs.io)
+    phenotype_folder = get_post_processed_phenotype_directory(configs.io)
+
+    camids_aligned, genotype_data_aligned, phenotype_data_aligned = (
+        load_chromosome_data(
+            genotype_folder / configs.experiment.genotype_scope,
+            phenotype_folder,
+            options.species,
+            options.wing,
+            options.color,
+            options.chromosome,
+        )
+    )
+
+    phenotype_data_aligned = phenotype_data_aligned[
+        :, options.out_dims_start_idx : options.out_dims_start_idx + options.out_dims
+    ]
+
+    metadata_folder = get_results_training_metadata_directory(configs.io)
+    train_split, val_split, test_split = split_data_by_file(
+        genotype_data_aligned,
+        phenotype_data_aligned,
+        camids_aligned,
+        metadata_folder,
+        options.species,
+    )
+
+    return train_split, val_split, test_split

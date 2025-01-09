@@ -1,10 +1,23 @@
+import json
 import os
 from collections import defaultdict
+from pathlib import Path
+from typing import Union
 
 import numpy as np
 import pandas as pd
 
-from gtp.tools import profile_exe_time
+from gtp.tools.timing import profile_exe_time
+
+
+def save_json(data, path):
+    with open(path, "w") as f:
+        json.dump(data, f)
+
+
+def load_json(path):
+    with open(path, "r") as f:
+        return json.load(f)
 
 
 # Deprecate soon
@@ -42,8 +55,9 @@ def align_data(dna_data, dna_camids, pheno_data):
     return dna_data, dna_camids, pheno_data
 
 
-@profile_exe_time
-def collect_chromosome(root, species, chromosome):
+def get_chromosome_scaffolds(
+    root: Union[str, Path], species: str, chromosome: int
+) -> Union[str, Path]:
     genotype_path_root = os.path.join(root, f"{species}")
     scaffolds = []
     for subdir in os.listdir(genotype_path_root):
@@ -59,15 +73,22 @@ def collect_chromosome(root, species, chromosome):
             assert False, f"Invalid species: {species}"
 
         if chrom_num == chromosome:
-            scaffolds.append([subdir, scaf_num])
+            scaffolds.append([os.path.join(genotype_path_root, subdir), scaf_num])
     scaffolds = sorted(scaffolds, key=lambda x: x[1])
+    return [x[0] for x in scaffolds]
+
+
+@profile_exe_time(verbose=False)
+def collect_chromosome(root, species, chromosome):
+    scaffolds = get_chromosome_scaffolds(
+        root=root, species=species, chromosome=chromosome
+    )
 
     final_camids = None
     compiled = None
-    for scaffold_dir, _ in scaffolds:
-        tgt_dir = os.path.join(genotype_path_root, scaffold_dir)
-        camids = np.load(os.path.join(tgt_dir, "camids.npy"))
-        data = np.load(os.path.join(tgt_dir, "ml_ready.npy"))
+    for scaffold_dir in scaffolds:
+        camids = np.load(os.path.join(scaffold_dir, "camids.npy"))
+        data = np.load(os.path.join(scaffold_dir, "ml_ready.npy"))
         sort_idx = np.argsort(camids)
         sorted_data = data[sort_idx].astype(np.byte)
         sorted_camids = camids[sort_idx]
@@ -81,7 +102,28 @@ def collect_chromosome(root, species, chromosome):
     return final_camids, compiled
 
 
-@profile_exe_time
+@profile_exe_time(verbose=False)
+def collect_chromosome_position_metadata(root, species, chromosome):
+    scaffolds = get_chromosome_scaffolds(
+        root=root, species=species, chromosome=chromosome
+    )
+
+    position_metadata = []
+    for scaffold_dir in scaffolds:
+        with open(os.path.join(scaffold_dir, "states.csv"), "r") as f:
+            line = f.readline()
+            columns = line.split(",")
+            # Ignore last column if it has a pandas artifact at the end. Result of incorrect processing :(
+            if "index_level" in columns[-1]:
+                columns = columns[:-1]
+            positions = [int(col.replace('"', "")) for col in columns]
+        scaffold_name = scaffold_dir.split(os.path.sep)[-1]
+        position_metadata.extend([[scaffold_name, x] for x in positions])
+
+    return position_metadata
+
+
+@profile_exe_time(verbose=False)
 def load_phenotype_data(phenotype_folder, species, wing, color):
     """Loads phenotype data for Heliconius butterflies (Erato & Melpomene)
 
@@ -102,7 +144,7 @@ def load_phenotype_data(phenotype_folder, species, wing, color):
     return pca_camids, pca_data
 
 
-@profile_exe_time
+@profile_exe_time(verbose=False)
 def align_genotype_and_phenotype_data(
     phenotype_camids, genotype_camids, phenotype_data, genotype_data
 ):
@@ -140,7 +182,7 @@ def align_genotype_and_phenotype_data(
     return phenotype_data_aligned, genotype_data_aligned, genotype_camids_aligned
 
 
-@profile_exe_time
+@profile_exe_time(verbose=False)
 def load_chromosome_data(
     genotype_folder, phenotype_folder, species, wing, color, chromosome, verbose=False
 ):

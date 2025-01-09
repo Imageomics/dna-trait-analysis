@@ -7,15 +7,16 @@ import pyarrow as pa
 import pyarrow.csv as csv
 
 from gtp.dataloading.tools import butterfly_states_to_ml_ready
-from gtp.tools import profile_exe_time
+from gtp.tools.timing import profile_exe_time
 
 
 class DataPreprocessor(ABC):
-    def __init__(self, input_dir, output_dir) -> None:
+    def __init__(self, input_dir, output_dir, verbose=False) -> None:
         super().__init__()
 
         self.input_dir = input_dir
         self.output_dir = output_dir
+        self.verbose = verbose
 
         self.process_ran = False
 
@@ -60,7 +61,7 @@ class ButterflyGenePreprocessor(DataPreprocessor):
         super().__init__(*args, **kwargs)
         self.genotype_data = None
 
-    @profile_exe_time
+    @profile_exe_time(verbose=False)
     def _process(self, pca_csv_path_suffix, verbose=False):
         """
         # of rows = # of positions
@@ -80,7 +81,7 @@ class ButterflyGenePreprocessor(DataPreprocessor):
         and the states we extract after the '=' symbol.
         """
 
-        @profile_exe_time
+        @profile_exe_time(verbose=False)
         def read_df():
             return pd.read_csv(
                 os.path.join(self.input_dir, pca_csv_path_suffix),
@@ -100,7 +101,7 @@ class ButterflyGenePreprocessor(DataPreprocessor):
             camid = x.iloc[0].split("=")[0]
             return camid
 
-        @profile_exe_time
+        @profile_exe_time(verbose=False)
         def df_extract_states(df):
             return df.apply(extract_states)
             # return df.map(extract_states_alt)
@@ -129,7 +130,7 @@ class ButterflyGenePreprocessor(DataPreprocessor):
         df = df.rename(columns=column_dict)
         states.columns = positions
 
-        @profile_exe_time
+        @profile_exe_time(verbose=False)
         def create_ml_ready(states):
             ml_ready = butterfly_states_to_ml_ready(states)
             ml_ready = ml_ready.astype(np.bool_)  # Saves significant memory
@@ -144,7 +145,7 @@ class ButterflyGenePreprocessor(DataPreprocessor):
             "ml_ready": ml_ready,
         }
 
-    @profile_exe_time
+    @profile_exe_time(verbose=False)
     def _save_result(self, path) -> None:
         os.makedirs(path, exist_ok=True)
 
