@@ -17,6 +17,9 @@ dependencies = [
 "pyarrow",
 "scipy",
 "captum",
+"dash-bio",
+"nbformat",
+"kaleido",
 "ipykernel",
 ]
 requires-python = "==3.10"

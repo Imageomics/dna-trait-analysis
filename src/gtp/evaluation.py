@@ -149,6 +149,7 @@ def get_lrp_attr(m, dloader, target=0):
     for i, batch in enumerate(dloader):
         m.zero_grad()
         data, pca = batch
+        data.requires_grad = True
         attr = att_model.attribute(data.cuda(), target=target)
         attr = attr.mean(-1)
         attr = attr[:, 0]  # Only has 1 channel, just extract it

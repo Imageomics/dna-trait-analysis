@@ -12,10 +12,12 @@ io: # input / output configurations
         root: null
         training_metadata: "dna/metadata"
         training_output: "dna/training_output"
+        plot_output: "dna/plot_results"
 global_butterfly_metadata:
     species: ["erato", "melpomene"]
     wings: ["forewings", "hindwings"]
     phenotypes: ["color_1", "color_2", "color_3", "total"]
+    number_of_chromosomes: 21
 experiment:
     genotype_scope: "genome" # Either 'genome', 'chromosomes', 'genes'
 training:

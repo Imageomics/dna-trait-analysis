@@ -27,3 +27,16 @@ def filter_topk_snps(scores, k=200):
     """
     sorted_scores = np.argsort(scores)
     return sorted_scores[-k:]
+
+
+def gather_model_predictions_and_actuals(model, dataloader):
+    model.eval()
+    actual = []
+    predicted = []
+    for batch in dataloader:
+        model.zero_grad()
+        data, pca = batch
+        out = model(data.cuda())
+        actual.extend(pca[:, 0].detach().cpu().numpy().tolist())
+        predicted.extend(out[:, 0].detach().cpu().numpy().tolist())
+    return actual, predicted

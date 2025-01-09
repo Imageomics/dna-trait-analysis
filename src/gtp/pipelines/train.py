@@ -16,12 +16,13 @@ from gtp.configs.project import GenotypeToPhenotypeConfigs
 from gtp.dataloading.data_collectors import load_training_data
 from gtp.dataloading.datasets import GTP_Dataset
 from gtp.dataloading.path_collectors import get_results_training_output_directory
-from gtp.evaluation import plot_attribution_graph, test
+from gtp.evaluation import test
 from gtp.models.net import SoyBeanNet
 from gtp.models.scheduler import Scheduler
 from gtp.options.training import TrainingOptions
 from gtp.tools.calculation import calc_pvalue_linear, filter_topk_snps
 from gtp.tools.logging import ExperimentLogger
+from gtp.tools.simple import create_exp_info_text
 from gtp.trainers.trackers import DNATrainingTracker
 from gtp.trainers.training_loops import BasicTrainingLoop
 
@@ -119,7 +120,7 @@ def train_model(
 
     best_model_weights = None
     best_err = 999999
-    best_pearson = 0
+    best_pearson = -2
     train_losses = []
     val_losses = []
     val_pearsons = []
@@ -195,7 +196,12 @@ def train(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions):
     train_data, val_data, test_data = load_training_data(configs, options)
 
     # Initialize Logger
-    exp_info = f"{options.species}_{options.wing}_{options.color}_chromosome_{options.chromosome}"
+    exp_info = create_exp_info_text(
+        species=options.species,
+        wing=options.wing,
+        color=options.color,
+        chromosome=options.chromosome,
+    )
     if options.top_k_chromosome_training:  # TODO handler top_k_chromosome training
         exp_info = f"{options.species}_{options.wing}_{options.color}_top_k_snps"
 
@@ -233,9 +239,12 @@ def train(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions):
         hidden_dim=options.hidden_dim,
         drop_out_prob=options.drop_out_prob,
     ).cuda()
+
+    # Train the model
     train_losses, val_losses, val_pearsons = train_model(
         options, train_dataloader, val_dataloader, model=model, logger=logger
     )
+
     torch.save(model.state_dict(), Path(logger.outdir, "model.pt"))
     end_t = time.perf_counter()
     total_duration = end_t - start_t
@@ -254,29 +263,30 @@ def train(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions):
 
     plot_loss_curves(train_losses, val_losses, logger.outdir)
 
-    start_t = time.perf_counter()
-    logger.log("Beginning attribution")
-    for att_method in ["cam", "lrp"]:
-        tr_pts, val_pts, test_pts = plot_attribution_graph(
-            model,
-            train_dataloader,
-            val_dataloader,
-            test_dataloader,
-            logger.outdir,
-            ignore_train=True,
-            mode=att_method,
-            ignore_plot=False,
-            use_new=True,
-        )
-
-        k = 2000
-        if options.top_k_chromosome_training:
-            k = num_vcfs
-        plot_pvalue_filtering(test_pts, test_dataset, logger, prefix=att_method, k=k)
-
-    end_t = time.perf_counter()
-    total_duration = end_t - start_t
-    logger.log(f"Total attribution time: {total_duration:.2f}s")
+    # TODO: significantly speed this up or just remove it from the training script
+    # start_t = time.perf_counter()
+    # logger.log("Beginning attribution")
+    # for att_method in ["cam", "lrp"]:
+    #    tr_pts, val_pts, test_pts = plot_attribution_graph(
+    #        model,
+    #        train_dataloader,
+    #        val_dataloader,
+    #        test_dataloader,
+    #        logger.outdir,
+    #        ignore_train=True,
+    #        mode=att_method,
+    #        ignore_plot=False,
+    #        use_new=True,
+    #    )
+    #
+    #    k = 2000
+    #    if options.top_k_chromosome_training:
+    #        k = num_vcfs
+    #    plot_pvalue_filtering(test_pts, test_dataset, logger, prefix=att_method, k=k)
+    #
+    # end_t = time.perf_counter()
+    # total_duration = end_t - start_t
+    # logger.log(f"Total attribution time: {total_duration:.2f}s")
 
 
 @click.command()

@@ -20,6 +20,7 @@ class ResultsIOConfigs:
     root: str
     training_metadata: str
     training_output: str
+    plot_output: str
 
 
 @dataclass
