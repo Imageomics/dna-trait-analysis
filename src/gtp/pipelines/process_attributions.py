@@ -72,37 +72,23 @@ def _process_chromosome(
     model = model.cuda()
     model.eval()
 
-    train_dataset = GTP_Dataset(*train_data)
-    val_dataset = GTP_Dataset(*val_data)
-    test_dataset = GTP_Dataset(*test_data)
-
-    train_dataloader = DataLoader(
-        val_dataset, batch_size=options.batch_size, num_workers=options.num_workers
-    )
-    val_dataloader = DataLoader(
-        val_dataset, batch_size=options.batch_size, num_workers=options.num_workers
-    )
-    test_dataloader = DataLoader(
-        test_dataset, batch_size=options.batch_size, num_workers=options.num_workers
-    )
-
-    # We are attributing on the first dimension
-    # TODO: add some adaptability here?
-    train_attributions = np.array(get_lrp_attr(model, train_dataloader, target=0))
-    val_attributions = np.array(get_lrp_attr(model, val_dataloader, target=0))
-    test_attributions = np.array(get_lrp_attr(model, test_dataloader, target=0))
-
-    train_stats = _get_evaluation_metrics(model, train_dataloader)
-    val_stats = _get_evaluation_metrics(model, val_dataloader)
-    test_stats = _get_evaluation_metrics(model, test_dataloader)
-
-    save_json(train_stats, experiment_dir / "training_metrics.json")
-    save_json(val_stats, experiment_dir / "validation_metrics.json")
-    save_json(test_stats, experiment_dir / "test_metrics.json")
-
-    np.save(experiment_dir / "training_attributions.npy", train_attributions)
-    np.save(experiment_dir / "validation_attributions.npy", val_attributions)
-    np.save(experiment_dir / "test_attributions.npy", test_attributions)
+    for data, phase_str in [
+        (train_data, "training"),
+        (val_data, "validation"),
+        (test_data, "test"),
+    ]:
+        dset = GTP_Dataset(*data)
+        dloader = DataLoader(
+            dset, batch_size=options.batch_size, num_workers=options.num_workers
+        )
+        # We are attributing on the first dimension
+        # TODO: add some adaptability here?
+        attribution_data = get_lrp_attr(
+            model, dloader, target=0, verbose=options.verbose, num_processes=8
+        )
+        eval_stats = _get_evaluation_metrics(model, dloader)
+        save_json(eval_stats, experiment_dir / f"{phase_str}_metrics.json")
+        np.save(experiment_dir / f"{phase_str}_attributions.npy", attribution_data)
 
 
 def _process_genome(
