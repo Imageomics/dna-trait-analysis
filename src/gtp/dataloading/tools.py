@@ -192,9 +192,9 @@ def load_chromosome_data(
     and 4 missing from erato phenotype
     """
 
-    def print_out(str):
+    def print_out(x):
         if verbose:
-            print(str)
+            print(x)
 
     # Collect phenotype data
     pca_camids, pca_data = load_phenotype_data(phenotype_folder, species, wing, color)

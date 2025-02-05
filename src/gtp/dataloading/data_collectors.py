@@ -9,8 +9,7 @@ from gtp.options.training import TrainingOptions
 from gtp.tools.timing import profile_exe_time
 
 
-@profile_exe_time(verbose=False)
-def load_training_data(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions):
+def load_chromosome_and_phenotype_data(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions):
     genotype_folder = get_post_processed_genotype_directory(configs.io)
     phenotype_folder = get_post_processed_phenotype_directory(configs.io)
 
@@ -28,6 +27,12 @@ def load_training_data(configs: GenotypeToPhenotypeConfigs, options: TrainingOpt
     phenotype_data_aligned = phenotype_data_aligned[
         :, options.out_dims_start_idx : options.out_dims_start_idx + options.out_dims
     ]
+    
+    return camids_aligned, genotype_data_aligned, phenotype_data_aligned
+
+@profile_exe_time(verbose=False)
+def load_training_data(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions, return_camids=False):
+    camids_aligned, genotype_data_aligned, phenotype_data_aligned = load_chromosome_and_phenotype_data(configs, options)
 
     metadata_folder = get_results_training_metadata_directory(configs.io)
     train_split, val_split, test_split = split_data_by_file(
@@ -37,5 +42,8 @@ def load_training_data(configs: GenotypeToPhenotypeConfigs, options: TrainingOpt
         metadata_folder,
         options.species,
     )
+    
+    if return_camids:
+        return train_split, val_split, test_split, camids_aligned
 
     return train_split, val_split, test_split

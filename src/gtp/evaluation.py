@@ -1,4 +1,5 @@
 import os
+from multiprocessing import Pool
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -143,26 +144,72 @@ def get_shapley_sampling_attr(m, dloader, target=0, n_samples=200, n_windows=100
     return attr_total
 
 
-def get_lrp_attr(m, dloader, target=0):
+def _lrp_pearson_stat_multi_fn(process_item):
+    snp_pos, data = process_item
+    pearson_results = pearsonr(data[:, 0], data[:, 1])
+    pcc = pearson_results.statistic
+    pvalue = pearson_results.pvalue
+    return snp_pos, pcc, pvalue
+
+
+def get_lrp_attr(m, dloader, target=0, verbose=False, num_processes=1):
     att_model = LRP(m)
-    attr_total = None
-    for i, batch in enumerate(dloader):
+    all_actuals = []
+    all_relevance_scores = []
+    for i, batch in tqdm(
+        enumerate(dloader), desc="Calculating LRP Attributions", disable=not verbose
+    ):
         m.zero_grad()
         data, pca = batch
         data.requires_grad = True
         attr = att_model.attribute(data.cuda(), target=target)
-        attr = attr.mean(-1)
+        # For LRP, this should be sum. This is because the attribution scores should all add up to be the find value in the prediction, so averaging could break that.
+        attr = attr.sum(-1)
         attr = attr[:, 0]  # Only has 1 channel, just extract it
         attr = attr.detach().cpu().numpy()
-        attr = np.abs(attr).mean(0)  # Sum across batch...Should we be summing here???
 
-        if attr_total is None:
-            attr_total = attr
-        else:
-            attr_total += attr
+        all_relevance_scores.append(attr)
+        all_actuals.append(pca[:, target].detach().cpu().numpy())
 
-    # attr_total = attr_total / np.linalg.norm(attr_total, ord=1) # Normalize
-    return attr_total
+    all_relevance_scores = np.concatenate(all_relevance_scores, axis=0)
+    all_actuals = np.concatenate(all_actuals, axis=0)
+    average_relevance_scores = np.abs(all_relevance_scores).mean(0)
+
+    process_results = []
+    N = all_relevance_scores.shape[1]
+    with (
+        Pool(processes=num_processes) as p,
+        tqdm(
+            total=N,
+            desc="Processing Genotype data",
+            colour="#87ceeb",  # Skyblue
+            disable=not verbose,
+        ) as pbar,
+    ):
+        process_data = [
+            (
+                i,
+                np.concatenate(
+                    (all_relevance_scores[:, i : i + 1], all_actuals[:, np.newaxis]),
+                    axis=1,
+                ),
+            )
+            for i in range(N)
+        ]
+        for result in p.imap_unordered(_lrp_pearson_stat_multi_fn, process_data):
+            process_results.append(result)
+            pbar.update()
+            pbar.refresh()
+
+    snp_pearson_stats = [x[1:] for x in sorted(process_results, key=lambda x: x[0])]
+
+    return np.concatenate(
+        (
+            average_relevance_scores[:, np.newaxis],
+            np.array(snp_pearson_stats).astype(np.float64),
+        ),
+        axis=1,
+    )
 
 
 # TODO: need to refactor, don't need new_new

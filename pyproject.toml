@@ -21,6 +21,7 @@ dependencies = [
 "nbformat",
 "kaleido",
 "seaborn",
+"statsmodels",
 "ipykernel",
 "ipywidgets",
 ]
