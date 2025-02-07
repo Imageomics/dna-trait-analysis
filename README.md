@@ -59,3 +59,9 @@ python -m gtp.pipelines.plot_attributions --species erato --color color_3 --wing
 ```
 
 NOTE: you have to have trained a model for every chromosome for a species in order for the above command to work on the entire genome. Otherwise, it'll only plot / calculate data for chromosomes with a trained model.
+
+# Calculate Pair-wise Epistasis Interactions
+Run the following command to get potential epistasis interactions:
+```
+TODO
+```

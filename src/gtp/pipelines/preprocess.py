@@ -121,7 +121,7 @@ def preprocess_genotypes(
             colour="#87ceeb",  # Skyblue
         ) as pbar,
     ):
-        for result in p.imap(_genotype_preprocess_fn, process_data):
+        for result in p.imap_unordered(_genotype_preprocess_fn, process_data):
             pbar.update()
             pbar.refresh()
 

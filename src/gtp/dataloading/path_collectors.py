@@ -55,6 +55,12 @@ def get_results_plot_output_directory(io_cfgs: IOConfigs) -> Path:
     return path
 
 
+def get_results_epistasis_output_directory(io_cfgs: IOConfigs) -> Path:
+    root = _select_override_if_exists(io_cfgs.default_root, io_cfgs.results.root)
+    path = Path(root, io_cfgs.results.epistasis_output)
+    return path
+
+
 def get_experiment_directory(
     io_cfgs: IOConfigs,
     species: str,

@@ -20,7 +20,10 @@ dependencies = [
 "dash-bio",
 "nbformat",
 "kaleido",
+"seaborn",
+"statsmodels",
 "ipykernel",
+"ipywidgets",
 ]
 requires-python = "==3.10"
 authors = []
