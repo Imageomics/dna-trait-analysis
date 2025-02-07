@@ -13,6 +13,7 @@ io: # input / output configurations
         training_metadata: "dna/metadata"
         training_output: "dna/training_output"
         plot_output: "dna/plot_results"
+        epistasis_output: "dna/epistasis_output"
 global_butterfly_metadata:
     species: ["erato", "melpomene"]
     wings: ["forewings", "hindwings"]
