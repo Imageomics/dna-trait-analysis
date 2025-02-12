@@ -21,6 +21,7 @@ class ResultsIOConfigs:
     training_metadata: str
     training_output: str
     plot_output: str
+    epistasis_output: str
 
 
 @dataclass

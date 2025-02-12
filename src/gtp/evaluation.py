@@ -1,5 +1,6 @@
 import os
 from multiprocessing import Pool
+from enum import Enum
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,6 +10,11 @@ from scipy.stats import pearsonr
 from tqdm import tqdm
 
 from gtp.models.forward import forward_step
+
+
+class AttributionMethod(Enum):
+    LRP = "lrp"  # Layerwise Relevance Propagation
+    PERTURB = "perturb"  # Perturbation on the DNA input states
 
 
 def test(tr_dloader, val_dloader, test_dloader, model, out_dims, out_dims_start_idx=0):
@@ -172,6 +178,83 @@ def get_lrp_attr(m, dloader, target=0, verbose=False, num_processes=1):
         ),
         axis=1,
     )
+
+
+def get_perturb_attr(m, dloader, target=0, verbose=False):
+    """This attribution method will record the change in the output (y) when changing the state of the input at each
+    feature location.
+
+    IMPORTANT: ensure the dataloader passed in has shuffle turned off for proper alignment!
+
+    Algorithm:
+    1. Each datapoint will be passed through the model to obtain baseline outputs (base_y)
+    2. For each feature dimension, for all inputs:
+        2a. The state will be shifted (AA -> Aa/aA, Aa/aA -> aa, aa -> AA)
+        2b. These shifted states will be passed through the model to obtain a perturbation affected output (perturb_y)
+        2c. We record the largest variance of the change in the output (perturb_y - base_y)
+    3. Average the magnitude of the variance change across samples (N)
+    4. Return average magnitude of each dimension (D)
+
+    Args:
+        m (_type_): The predictive model
+        dloader (_type_): The dataloader that returns the intput X and output y
+        target (int, optional): The index of the output for the desired attribution. Defaults to 0.
+        verbose (bool, optional): Set True if everything is to be printed. Defaults to False.
+
+    Returns:
+        _type_: The resulting attributions per input dimension D
+    """
+    m.eval()
+
+    with torch.no_grad():
+        all_max_changes = None  # Should be N x D
+        for i, batch in tqdm(
+            enumerate(dloader),
+            desc="Calculating perturbation attributions",
+            colour="#87ceeb",
+            disable=not verbose,
+            leave=True,
+            position=1,
+        ):
+            data, pca = batch  # data => B x D x 3
+            output = m(data.cuda())[:, target]
+            base_y = output.detach().cpu()
+            B, C, D, _ = data.shape  # batch x 1 x dimension x 3
+            batch_max_magnitudes = np.zeros((B, D))
+            for d in tqdm(
+                range(D), desc="Perturbing batch", colour="red", position=0, leave=False
+            ):
+                data_perturbed = data.detach().clone()
+                outputs_from_shifts = None
+                for shift in range(2):
+                    data_perturbed[:, :, d, :] = data_perturbed[:, :, d, :][
+                        :, :, torch.tensor([2, 0, 1])
+                    ]  # Shift columns to the right. this simulates a state change if the input is 1-hot
+                    perturbed_output = (
+                        m(data_perturbed.cuda())[:, target].detach().cpu()
+                    )
+                    variance_magnitude = torch.abs(
+                        (perturbed_output - base_y)
+                    ).unsqueeze(-1)
+                    if outputs_from_shifts is None:
+                        outputs_from_shifts = variance_magnitude
+                    else:
+                        outputs_from_shifts = torch.cat(
+                            (outputs_from_shifts, variance_magnitude), dim=1
+                        )
+                # Record max of the two state changes
+                batch_max_magnitudes[:, d] = torch.max(outputs_from_shifts, dim=1)[0]
+
+            if all_max_changes is None:
+                all_max_changes = batch_max_magnitudes
+            else:
+                all_max_changes = torch.cat(
+                    (all_max_changes, batch_max_magnitudes), dim=0
+                )
+
+    averaged_max_changes = all_max_changes.mean(0)  # D
+    print(averaged_max_changes.shape)
+    return averaged_max_changes
 
 
 # TODO: need to refactor, don't need new_new

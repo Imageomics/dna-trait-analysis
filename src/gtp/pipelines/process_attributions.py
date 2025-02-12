@@ -14,7 +14,7 @@ from gtp.dataloading.data_collectors import load_training_data
 from gtp.dataloading.datasets import GTP_Dataset
 from gtp.dataloading.path_collectors import get_experiment_directory
 from gtp.dataloading.tools import save_json
-from gtp.evaluation import get_lrp_attr
+from gtp.evaluation import AttributionMethod, get_lrp_attr, get_perturb_attr
 from gtp.models.net import SoyBeanNet
 from gtp.options.process_attribution import ProcessAttributionOptions
 from gtp.tools.calculation import gather_model_predictions_and_actuals
@@ -83,12 +83,25 @@ def _process_chromosome(
         )
         # We are attributing on the first dimension
         # TODO: add some adaptability here?
-        attribution_data = get_lrp_attr(
-            model, dloader, target=0, verbose=options.verbose, num_processes=8
-        )
+        if options.attr_method == AttributionMethod.LRP.value:
+            attribution_data = get_lrp_attr(
+                model, dloader, target=0, verbose=options.verbose, num_processes=8
+            )
+        elif options.attr_method == AttributionMethod.PERTURB.value:
+            attribution_data = get_perturb_attr(
+                model, dloader, target=0, verbose=options.verbose
+            )
+        else:
+            raise NotImplementedError(
+                f"{options.attr_method} is not an implemented attribution method."
+            )
+
         eval_stats = _get_evaluation_metrics(model, dloader)
         save_json(eval_stats, experiment_dir / f"{phase_str}_metrics.json")
-        np.save(experiment_dir / f"{phase_str}_attributions.npy", attribution_data)
+        np.save(
+            experiment_dir / f"{phase_str}_{options.attr_method}_attributions.npy",
+            attribution_data,
+        )
 
 
 def _process_genome(
