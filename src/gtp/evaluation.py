@@ -11,31 +11,6 @@ from tqdm import tqdm
 from gtp.models.forward import forward_step
 
 
-def do_knockout(model, dloader, target=0, out_dims=1):
-    def knockout(batch, pos):
-        name, data, pca = batch
-        # knockout
-        data[:, :, pos] = torch.zeros_like(data[:, :, pos]).to(data.device)
-        return name, data, pca
-
-    for batch in dloader:
-        dim_size = batch[1].shape[2]
-        break
-    knockout_values = []
-    print(f"DIM SIZE: {dim_size}")
-    for pos in tqdm(range(dim_size), desc="Performing knockout"):
-        total_rmse = 0
-        for batch in dloader:
-            batch = knockout(batch, pos)
-            mse, rmse = forward_step(model, batch, None, out_dims, is_train=False)
-            total_rmse += rmse
-
-        avg_rmse = total_rmse / len(dloader)
-        knockout_values.append(avg_rmse)
-
-    return knockout_values
-
-
 def test(tr_dloader, val_dloader, test_dloader, model, out_dims, out_dims_start_idx=0):
     rmses = []
     for dl in [tr_dloader, val_dloader, test_dloader]:
@@ -55,19 +30,6 @@ def test(tr_dloader, val_dloader, test_dloader, model, out_dims, out_dims_start_
         rmses.append(avg_rmse)
 
     return rmses
-
-
-def calc_pearson_correlation(model, dloader, index=0):
-    model.eval()
-    actual = []
-    predicted = []
-    for i, batch in enumerate(dloader):
-        model.zero_grad()
-        name, data, pca = batch
-        out = model(data.cuda())
-        actual.extend(pca[:, index].detach().cpu().numpy().tolist())
-        predicted.extend(out[:, index].detach().cpu().numpy().tolist())
-    return pearsonr(predicted, actual)
 
 
 def compile_attribution(attr):
