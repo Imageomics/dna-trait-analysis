@@ -184,6 +184,8 @@ def get_perturb_attr(m, dloader, target=0, verbose=False):
     """This attribution method will record the change in the output (y) when changing the state of the input at each
     feature location.
 
+    VERY SLOW at the moment. TODO: speed this up
+
     IMPORTANT: ensure the dataloader passed in has shuffle turned off for proper alignment!
 
     Algorithm:
