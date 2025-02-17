@@ -56,9 +56,15 @@ def _process_chromosome(
         return
 
     # Load attributions
-    train_attributions = np.load(experiment_dir / "training_attributions.npy")
-    val_attributions = np.load(experiment_dir / "validation_attributions.npy")
-    test_attributions = np.load(experiment_dir / "test_attributions.npy")
+    train_attributions = np.load(
+        experiment_dir / f"training_{options.attr_method}_attributions.npy"
+    )
+    val_attributions = np.load(
+        experiment_dir / f"validation_{options.attr_method}_attributions.npy"
+    )
+    test_attributions = np.load(
+        experiment_dir / f"test_{options.attr_method}_attributions.npy"
+    )
     train_metrics = load_json(experiment_dir / "training_metrics.json")
     val_metrics = load_json(experiment_dir / "validation_metrics.json")
     test_metrics = load_json(experiment_dir / "test_metrics.json")
@@ -85,12 +91,10 @@ def _process_chromosome(
         for i, x in enumerate(position_metadata)
     ]
 
-    df_train_data = np.concatenate(
-        (metadata, train_attributions), axis=1
-    )
+    df_train_data = np.concatenate((metadata, train_attributions), axis=1)
     df_val_data = np.concatenate((metadata, val_attributions), axis=1)
     df_test_data = np.concatenate((metadata, test_attributions), axis=1)
-    
+
     # ["BP", "CHR", "SNP", "Attribution", "PCC", "PVAL"]
     attribution_idx = 3
 
@@ -99,12 +103,12 @@ def _process_chromosome(
         df_train_data = df_train_data[
             df_train_data[:, attribution_idx].astype(np.float32).argsort()
         ][-options.top_n :]
-        df_val_data = df_val_data[df_val_data[:, attribution_idx].astype(np.float32).argsort()][
-            -options.top_n :
-        ]
-        df_test_data = df_test_data[df_test_data[:, attribution_idx].astype(np.float32).argsort()][
-            -options.top_n :
-        ]
+        df_val_data = df_val_data[
+            df_val_data[:, attribution_idx].astype(np.float32).argsort()
+        ][-options.top_n :]
+        df_test_data = df_test_data[
+            df_test_data[:, attribution_idx].astype(np.float32).argsort()
+        ][-options.top_n :]
 
         # Reorder by base pair
         df_train_data = df_train_data[df_train_data[:, 0].astype(np.int64).argsort()]
@@ -189,8 +193,15 @@ def create_manhattan_plot_static(
 
     return manhattanplot
 
+
 def _plot_manhattan_plot_static_matplotlib(
-    configs: GenotypeToPhenotypeConfigs, options: PlotAttributionOptions, train_df: pd.DataFrame, val_df: pd.DataFrame, test_df: pd.DataFrame, metrics: Any, y_val: str
+    configs: GenotypeToPhenotypeConfigs,
+    options: PlotAttributionOptions,
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    metrics: Any,
+    y_val: str,
 ):
     # Plot constants
     TITLE_FONT_SIZE = 22
@@ -206,7 +217,7 @@ def _plot_manhattan_plot_static_matplotlib(
     )
     fig.suptitle(title_str, fontsize=TITLE_FONT_SIZE)
 
-    if y_val in ["PVAL"]: # TODO handle 0 pvalues....
+    if y_val in ["PVAL"]:  # TODO handle 0 pvalues....
         new_y_val = f"-log10({y_val})"
         train_df[new_y_val] = -np.log10(train_df[y_val])
         val_df[new_y_val] = -np.log10(val_df[y_val])
@@ -219,9 +230,12 @@ def _plot_manhattan_plot_static_matplotlib(
             test_df[y_val].max(),
         )
     else:
-        raise NotImplementedError(f"{y_val} is not a valid y_val for manhattan plotting")
-    
+        raise NotImplementedError(
+            f"{y_val} is not a valid y_val for manhattan plotting"
+        )
+
     bar_value_key = "pvalue"
+
     def do_neg_log_on_bar_y():
         return bar_value_key in ["pvalue", "rmse"]
 
@@ -337,6 +351,7 @@ def _plot_manhattan_plot_static_matplotlib(
 
     return fig
 
+
 def create_manhattan_plot_static_matplotlib(
     configs: GenotypeToPhenotypeConfigs, options: PlotAttributionOptions
 ):
@@ -358,11 +373,16 @@ def create_manhattan_plot_static_matplotlib(
                 options.chromosome: test_metrics,
             },
         }
-        
+
     for tgt_y_val in ["Attribution", "PCC", "PVAL"]:
-        
         fig = _plot_manhattan_plot_static_matplotlib(
-            configs=configs, options=options, train_df=train_df, val_df=val_df, test_df=test_df, metrics=metrics, y_val="Attribution"
+            configs=configs,
+            options=options,
+            train_df=train_df,
+            val_df=val_df,
+            test_df=test_df,
+            metrics=metrics,
+            y_val="Attribution",
         )
 
         plot_output_dir = get_results_plot_output_directory(configs.io)

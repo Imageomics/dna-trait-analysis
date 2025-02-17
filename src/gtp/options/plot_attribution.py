@@ -5,6 +5,7 @@ from gtp.options.base import BaseOptions
 
 @dataclass(kw_only=True)
 class PlotAttributionOptions(BaseOptions):
+    attr_method: str = "lrp"  # See gtp.evaluation.AttributionMethod for options
     species: str = "erato"
     chromosome: int = 1
     color: str = "total"

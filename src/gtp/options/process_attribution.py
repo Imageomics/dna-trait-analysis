@@ -5,6 +5,7 @@ from gtp.options.base import BaseOptions
 
 @dataclass(kw_only=True)
 class ProcessAttributionOptions(BaseOptions):
+    attr_method: str = "lrp"  # See gtp.evaluation.AttributionMethod for options
     batch_size: int = 64
     num_workers: int = 8
     drop_out_prob: float = 0.75
