@@ -37,17 +37,36 @@ def get_optimizer(optimizer: str, lr: float, params: torch.nn.parameter.Paramete
 
 
 def calc_pearson_correlation(model, dloader):
+    """We only care about the correlation between the observed prediction and the actual prediction.
+       The pvalue is irrelevant here since we have no hypothesis. When multiple dimensions are given for
+       y, then the average between all correlation coefficients is calcualted and returned.
+
+    Args:
+        model (_type_): _description_
+        dloader (_type_): _description_
+
+    Returns:
+        float: mean pearson correlation coefficient between all output predicted and actuals
+    """
     model.eval()
     actual = []
     predicted = []
     for i, batch in enumerate(dloader):
-        model.zero_grad()
-        data, pca = batch
-        out = model(data.cuda())
-        actual.extend(pca[:, 0].detach().cpu().numpy().tolist())
-        predicted.extend(out[:, 0].detach().cpu().numpy().tolist())
-    pr = pearsonr(predicted, actual)
-    return pr.statistic, pr.pvalue
+        with torch.no_grad():
+            data, pca = batch
+            if len(actual) == 0:
+                actual.extend([[] for _ in range(pca.shape[1])])
+                predicted.extend([[] for _ in range(pca.shape[1])])
+            out = model(data.cuda())
+            for d in range(pca.shape[1]):
+                actual[d].extend(pca[:, 0].detach().cpu().numpy().tolist())
+                predicted[d].extend(out[:, 0].detach().cpu().numpy().tolist())
+
+    pearson_stats = []
+    for act, pred in zip(actual, predicted):
+        pr = pearsonr(pred, act)
+        pearson_stats.append(pr.statistic)
+    return np.array(pearson_stats).mean()
 
 
 def plot_loss_curves(train_losses, val_losses, outdir):
@@ -162,7 +181,7 @@ def train_model(
         best_diff_e = 0  # min(best_diff_e, best_diff)
         worst_diff_e = 0  # max(worst_diff_e, worst_diff)
 
-        pearson_stat, pval = calc_pearson_correlation(model, val_dloader)
+        pearson_stat = calc_pearson_correlation(model, val_dloader)
 
         if options.save_stat == "loss" and avg_val_rmse <= best_err:
             logger.log("Saving Model")
@@ -181,7 +200,7 @@ def train_model(
             r = round(v, 4)
             return f"{r:.4f}"
 
-        out_str = f"Epoch {epoch+1}/{options.epochs}: Train RMSE: {rs(avg_train_rmse)} | Val RMSE: {rs(avg_val_rmse)} | Val Pearson: {pearson_stat}"
+        out_str = f"Epoch {epoch + 1}/{options.epochs}: Train RMSE: {rs(avg_train_rmse)} | Val RMSE: {rs(avg_val_rmse)} | Val Pearson: {pearson_stat}"
         out_str += f" | Best Diff: {rs(best_diff_e)} | Worst Diff: {rs(worst_diff_e)}"
         logger.log(out_str)
 
@@ -212,6 +231,7 @@ def train(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions):
         log_fname="training",
         verbose=options.verbose,
     )
+    print(f"Logging at: {logger.get_log_location()}")
 
     num_vcfs = train_data[0].shape[1]
     logger.log(f"Input size: {num_vcfs}")

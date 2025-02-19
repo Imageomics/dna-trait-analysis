@@ -81,15 +81,23 @@ def _process_chromosome(
         dloader = DataLoader(
             dset, batch_size=options.batch_size, num_workers=options.num_workers
         )
-        # We are attributing on the first dimension
-        # TODO: add some adaptability here?
+
+        targets = [
+            idx + options.out_dims_start_idx_attribution
+            for idx in range(options.out_dims_attribution)
+        ]
+
         if options.attr_method == AttributionMethod.LRP.value:
             attribution_data = get_lrp_attr(
-                model, dloader, target=0, verbose=options.verbose, num_processes=8
+                model,
+                dloader,
+                targets=targets,
+                verbose=options.verbose,
+                num_processes=8,
             )
         elif options.attr_method == AttributionMethod.PERTURB.value:
             attribution_data = get_perturb_attr(
-                model, dloader, target=0, verbose=options.verbose
+                model, dloader, targets=targets, verbose=options.verbose
             )
         else:
             raise NotImplementedError(
