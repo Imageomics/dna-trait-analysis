@@ -34,7 +34,7 @@ class Phases(Enum):
 def _process_chromosome(
     configs: GenotypeToPhenotypeConfigs,
     options: PlotAttributionOptions,
-    chromosome: int,
+    chromosome: int = None,
 ):
     if chromosome is not None:
         options = dataclasses.replace(options)
@@ -49,11 +49,10 @@ def _process_chromosome(
     )
 
     experiment_dir = training_output_dir / options.exp_name / exp_info
-    if not os.path.exists(experiment_dir):
-        print(
+    if not experiment_dir.exists():
+        raise FileNotFoundError(
             f"{experiment_dir} does not exist. Unable to process chromosome {options.chromosome}"
         )
-        return
 
     # Load attributions
     train_attributions = np.load(
@@ -65,6 +64,29 @@ def _process_chromosome(
     test_attributions = np.load(
         experiment_dir / f"test_{options.attr_method}_attributions.npy"
     )
+
+    # Aggreate attributions
+    plot_targets = [
+        idx + options.out_dims_start_idx_attribution
+        for idx in range(options.out_dims_attribution)
+    ]
+    if options.attribution_aggregation == "mean":
+        train_attributions = train_attributions[plot_targets].mean(0)
+        val_attributions = val_attributions[plot_targets].mean(0)
+        test_attributions = test_attributions[plot_targets].mean(0)
+    elif options.attribution_aggregation == "sum":
+        train_attributions = train_attributions[plot_targets].sum(0)
+        val_attributions = val_attributions[plot_targets].sum(0)
+        test_attributions = test_attributions[plot_targets].sum(0)
+    elif options.attribution_aggregation == "max":
+        train_attributions = np.max(train_attributions[plot_targets], axis=0)
+        val_attributions = np.max(val_attributions[plot_targets], axis=0)
+        test_attributions = np.max(test_attributions[plot_targets], axis=0)
+    else:
+        raise NotImplementedError(
+            f"{options.attribution_aggregation} has not been implemented as an aggregation method."
+        )
+
     train_metrics = load_json(experiment_dir / "training_metrics.json")
     val_metrics = load_json(experiment_dir / "validation_metrics.json")
     test_metrics = load_json(experiment_dir / "test_metrics.json")
@@ -91,11 +113,13 @@ def _process_chromosome(
         for i, x in enumerate(position_metadata)
     ]
 
-    df_train_data = np.concatenate((metadata, train_attributions), axis=1)
-    df_val_data = np.concatenate((metadata, val_attributions), axis=1)
-    df_test_data = np.concatenate((metadata, test_attributions), axis=1)
+    df_train_data = np.concatenate(
+        (metadata, train_attributions[:, np.newaxis]), axis=1
+    )
+    df_val_data = np.concatenate((metadata, val_attributions[:, np.newaxis]), axis=1)
+    df_test_data = np.concatenate((metadata, test_attributions[:, np.newaxis]), axis=1)
 
-    # ["BP", "CHR", "SNP", "Attribution", "PCC", "PVAL"]
+    # ["BP", "CHR", "SNP", "Attribution"]
     attribution_idx = 3
 
     if options.top_n > 0:
@@ -115,7 +139,7 @@ def _process_chromosome(
         df_val_data = df_val_data[df_val_data[:, 0].astype(np.int64).argsort()]
         df_test_data = df_test_data[df_test_data[:, 0].astype(np.int64).argsort()]
 
-    column_names = ["BP", "CHR", "SNP", "Attribution", "PCC", "PVAL"]
+    column_names = ["BP", "CHR", "SNP", "Attribution"]
     # NOTE: The PCC (pearson correlation coeficient) and the PVAL (pvalue) are measured between the attribution the ground truth phenotype.
     train_df = pd.DataFrame(data=df_train_data, columns=column_names)
     val_df = pd.DataFrame(data=df_val_data, columns=column_names)
@@ -355,9 +379,14 @@ def _plot_manhattan_plot_static_matplotlib(
 def create_manhattan_plot_static_matplotlib(
     configs: GenotypeToPhenotypeConfigs, options: PlotAttributionOptions
 ):
-    if configs.experiment.genotype_scope == "genome":
+    if (
+        configs.experiment.genotype_scope == "genome"
+        and not options.plot_one_chromosome
+    ):
         train_df, val_df, test_df, metrics = _process_genome(configs, options)
-    elif configs.experiment.genotype_scope == "chromosome":
+    elif (
+        configs.experiment.genotype_scope == "chromosome" or options.plot_one_chromosome
+    ):
         # There is a bug if we just process a single chromosome in the dashbio package
         train_df, val_df, test_df, train_metrics, val_metrics, test_metrics = (
             _process_chromosome(configs, options)
@@ -373,8 +402,10 @@ def create_manhattan_plot_static_matplotlib(
                 options.chromosome: test_metrics,
             },
         }
+    else:
+        raise NotImplementedError("Plot configurations are not valid.")
 
-    for tgt_y_val in ["Attribution", "PCC", "PVAL"]:
+    for tgt_y_val in ["Attribution"]:
         fig = _plot_manhattan_plot_static_matplotlib(
             configs=configs,
             options=options,
@@ -382,7 +413,7 @@ def create_manhattan_plot_static_matplotlib(
             val_df=val_df,
             test_df=test_df,
             metrics=metrics,
-            y_val="Attribution",
+            y_val=tgt_y_val,
         )
 
         plot_output_dir = get_results_plot_output_directory(configs.io)

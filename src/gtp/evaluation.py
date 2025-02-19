@@ -5,6 +5,7 @@ from enum import Enum
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from torch.nn.functional import l1_loss, mse_loss
 from captum.attr import LRP, GuidedGradCam, Occlusion, Saliency, ShapleyValueSampling
 from scipy.stats import pearsonr
 from tqdm import tqdm
@@ -120,7 +121,10 @@ def _lrp_pearson_stat_multi_fn(process_item):
     return snp_pos, pcc, pvalue
 
 
-def get_lrp_attr(m, dloader, target=0, verbose=False, num_processes=1):
+def get_lrp_attr(m, dloader, targets=0, verbose=False, num_processes=1):
+    if isinstance(targets, int):
+        targets = [targets]
+
     att_model = LRP(m)
     all_actuals = []
     all_relevance_scores = []
@@ -130,57 +134,28 @@ def get_lrp_attr(m, dloader, target=0, verbose=False, num_processes=1):
         m.zero_grad()
         data, pca = batch
         data.requires_grad = True
-        attr = att_model.attribute(data.cuda(), target=target)
-        # For LRP, this should be sum. This is because the attribution scores should all add up to be the find value in the prediction, so averaging could break that.
-        attr = attr.sum(-1)
-        attr = attr[:, 0]  # Only has 1 channel, just extract it
-        attr = attr.detach().cpu().numpy()
+        all_attrs = []
+        for tgt in targets:
+            attr = att_model.attribute(data.cuda(), target=tgt)
+            all_attrs.append(attr.detach().cpu())
+        all_attrs = torch.stack(all_attrs, dim=0)
+        # For LRP, this (ONE-HOT state ex. [0,0,1] attributions) should be sum.
+        # This is because the attribution scores should all add up to be the find value in the prediction, so averaging could break that.
+        all_attrs = all_attrs.sum(-1)
+        all_attrs = all_attrs[:, :, 0]  # Only has 1 channel, just extract it
+        all_attrs = (
+            all_attrs.detach().cpu().numpy()
+        )  # Num-Targets x Batch-Size x Input-Dimension
 
-        all_relevance_scores.append(attr)
-        all_actuals.append(pca[:, target].detach().cpu().numpy())
+        all_relevance_scores.append(all_attrs)
 
-    all_relevance_scores = np.concatenate(all_relevance_scores, axis=0)
-    all_actuals = np.concatenate(all_actuals, axis=0)
-    average_relevance_scores = np.abs(all_relevance_scores).mean(0)
+    all_relevance_scores = np.concatenate(all_relevance_scores, axis=1)
+    average_relevance_scores = np.abs(all_relevance_scores).mean(1)
 
-    process_results = []
-    N = all_relevance_scores.shape[1]
-    with (
-        Pool(processes=num_processes) as p,
-        tqdm(
-            total=N,
-            desc="Processing Genotype data",
-            colour="#87ceeb",  # Skyblue
-            disable=not verbose,
-        ) as pbar,
-    ):
-        process_data = [
-            (
-                i,
-                np.concatenate(
-                    (all_relevance_scores[:, i : i + 1], all_actuals[:, np.newaxis]),
-                    axis=1,
-                ),
-            )
-            for i in range(N)
-        ]
-        for result in p.imap_unordered(_lrp_pearson_stat_multi_fn, process_data):
-            process_results.append(result)
-            pbar.update()
-            pbar.refresh()
-
-    snp_pearson_stats = [x[1:] for x in sorted(process_results, key=lambda x: x[0])]
-
-    return np.concatenate(
-        (
-            average_relevance_scores[:, np.newaxis],
-            np.array(snp_pearson_stats).astype(np.float64),
-        ),
-        axis=1,
-    )
+    return average_relevance_scores
 
 
-def get_perturb_attr(m, dloader, target=0, verbose=False):
+def get_perturb_attr(m, dloader, targets=0, distance_fn="l1", verbose=False):
     """This attribution method will record the change in the output (y) when changing the state of the input at each
     feature location.
 
@@ -200,12 +175,15 @@ def get_perturb_attr(m, dloader, target=0, verbose=False):
     Args:
         m (_type_): The predictive model
         dloader (_type_): The dataloader that returns the intput X and output y
-        target (int, optional): The index of the output for the desired attribution. Defaults to 0.
+        targets (List[int], optional): The indexs of the output for the desired attribution. Defaults to 0.
+        distance_fn (str, optional): The distance function to calculate the perturbed effect. Defaults to l1.
         verbose (bool, optional): Set True if everything is to be printed. Defaults to False.
 
     Returns:
         _type_: The resulting attributions per input dimension D
     """
+    if isinstance(targets, int):
+        targets = [targets]
     m.eval()
 
     with torch.no_grad():
@@ -219,7 +197,9 @@ def get_perturb_attr(m, dloader, target=0, verbose=False):
             position=1,
         ):
             data, pca = batch  # data => B x D x 3
-            output = m(data.cuda())[:, target]
+            all_attrs = []
+            all_attrs = torch.stack(all_attrs, dim=0)
+            output = m(data.cuda())[:, targets]
             base_y = output.detach().cpu()
             B, C, D, _ = data.shape  # batch x 1 x dimension x 3
             batch_max_magnitudes = np.zeros((B, D))
@@ -233,11 +213,13 @@ def get_perturb_attr(m, dloader, target=0, verbose=False):
                         :, :, torch.tensor([2, 0, 1])
                     ]  # Shift columns to the right. this simulates a state change if the input is 1-hot
                     perturbed_output = (
-                        m(data_perturbed.cuda())[:, target].detach().cpu()
+                        m(data_perturbed.cuda())[:, targets].detach().cpu()
                     )
-                    variance_magnitude = torch.abs(
-                        (perturbed_output - base_y)
-                    ).unsqueeze(-1)
+                    if distance_fn == "l1":
+                        diff = l1_loss(perturbed_output, base_y)
+                    elif distance_fn in ["l2", "mse"]:
+                        diff = mse_loss(perturbed_output, base_y)
+                    variance_magnitude = diff.unsqueeze(-1)
                     if outputs_from_shifts is None:
                         outputs_from_shifts = variance_magnitude
                     else:
@@ -255,7 +237,6 @@ def get_perturb_attr(m, dloader, target=0, verbose=False):
                 )
 
     averaged_max_changes = all_max_changes.mean(0)  # D
-    print(averaged_max_changes.shape)
     return averaged_max_changes
 
 
