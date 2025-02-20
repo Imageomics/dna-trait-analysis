@@ -65,3 +65,9 @@ Run the following command to get potential epistasis interactions:
 ```
 TODO
 ```
+
+# Extracting Projection Matrix from .rds data file
+To extract the PCA projection matrix from ```.rds``` files as a result of the ```genotype-phenotype``` pipeline, use the ```scripts/r/extract_projection_matrix.R``` R script. You will have to install R on your machine. With conda it can be done by running: ```conda install conda-forge::r-base```. Run the script as follows:
+```
+Rscript scripts/r/extract_projection_matrix.R [input_file].rds [output_file].csv
+```
