@@ -6,7 +6,7 @@ class ExperimentLogger:
         self.outdir = Path(logging_dir, exp_name)
         self.log_fname = log_fname
         self.verbose = verbose
-        self.outdir.mkdir(exist_ok=True)
+        self.outdir.mkdir(parents=True, exist_ok=True)
 
     def get_log_location(self, log_name=None):
         log_name = log_name if log_name else self.log_fname

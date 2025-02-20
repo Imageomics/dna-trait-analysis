@@ -1,12 +1,14 @@
-exp_name=base
+exp_name=pca_10
 species_list="erato melpomene"
 color_list="color_3 total color_1 color_2"
 wing_list="forewings hindwings"
-epochs=20
+epochs=50
 batch_size=32
 start_chromosome=1
 end_chromosome=21
-available_gpus=(4 5 6)
+out_dims=10
+out_dims_start_idx=0
+available_gpus=(1 2 3 4)
 
 commands_to_execute=()
 for wing in $wing_list
@@ -25,6 +27,8 @@ do
                 cmd="${cmd} --epochs ${epochs}"
                 cmd="${cmd} --batch_size ${batch_size}"
                 cmd="${cmd} --exp_name ${exp_name}"
+                cmd="${cmd} --out_dims ${out_dims}"
+                cmd="${cmd} --out_dims_start_idx ${out_dims_start_idx}"
                 commands_to_execute=("${commands_to_execute[@]}" "${cmd}")
             done
         done
