@@ -22,6 +22,7 @@ class TrainingOptions(BaseOptions):
     wing: str = "forewings"
     exp_name: str = "debug"
     verbose: bool = False
+    force_retrain: bool = False
     scheduler: str = "none"
     optimizer: str = "adam"
     save_stat: str = "pearson"

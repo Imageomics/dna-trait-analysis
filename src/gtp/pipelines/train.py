@@ -211,9 +211,6 @@ def train_model(
 
 
 def train(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions):
-    # Load Training Data
-    train_data, val_data, test_data = load_training_data(configs, options)
-
     # Initialize Logger
     exp_info = create_exp_info_text(
         species=options.species,
@@ -232,6 +229,14 @@ def train(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions):
         verbose=options.verbose,
     )
     print(f"Logging at: {logger.get_log_location()}")
+
+    done_log_location = logger.get_log_location(log_name="DONE")
+    if done_log_location.exists() and not options.force_retrain:
+        print("Already trained this model")
+        return
+
+    # Load Training Data
+    train_data, val_data, test_data = load_training_data(configs, options)
 
     num_vcfs = train_data[0].shape[1]
     logger.log(f"Input size: {num_vcfs}")
@@ -307,6 +312,8 @@ def train(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions):
     # end_t = time.perf_counter()
     # total_duration = end_t - start_t
     # logger.log(f"Total attribution time: {total_duration:.2f}s")
+
+    logger.log("Completed!", log_name="DONE")
 
 
 @click.command()
