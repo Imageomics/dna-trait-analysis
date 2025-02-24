@@ -24,6 +24,7 @@ dependencies = [
 "statsmodels",
 "ipykernel",
 "ipywidgets",
+"dash",
 ]
 requires-python = "==3.10"
 authors = []
