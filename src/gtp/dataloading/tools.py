@@ -46,9 +46,9 @@ def align_data(dna_data, dna_camids, pheno_data):
         inplace=True,
     )
 
-    assert (
-        dna_camids.shape[0] == pheno_data.shape[0] == dna_data.shape[0]
-    ), "Unequal X and Y in data"
+    assert dna_camids.shape[0] == pheno_data.shape[0] == dna_data.shape[0], (
+        "Unequal X and Y in data"
+    )
     for x, y in zip(pheno_data.camid.values.tolist(), dna_camids.tolist()):
         assert x == y, f"{x} != {y}. Data not aligned"
 
@@ -175,9 +175,9 @@ def align_genotype_and_phenotype_data(
     phenotype_camids_aligned = phenotype_camids[~idx]
     phenotype_data_aligned = phenotype_data[~idx]
 
-    assert (
-        phenotype_camids_aligned == genotype_camids_aligned
-    ).all(), "Invalid alignment"
+    assert (phenotype_camids_aligned == genotype_camids_aligned).all(), (
+        "Invalid alignment"
+    )
 
     return phenotype_data_aligned, genotype_data_aligned, genotype_camids_aligned
 
@@ -252,7 +252,7 @@ def split_data_by_file(
     )
 
 
-def butterfly_states_to_ml_ready(df):
+def get_ml_state_map():
     # 0:
     # 1:
     state_map = defaultdict(
@@ -264,6 +264,11 @@ def butterfly_states_to_ml_ready(df):
             "1|1": [0, 0, 1],
         },
     )
+    return state_map
+
+
+def butterfly_states_to_ml_ready(df):
+    state_map = get_ml_state_map()
 
     ml_ready = df.map(lambda x: state_map[x])
     ml_ready = np.array(ml_ready.values.tolist())
