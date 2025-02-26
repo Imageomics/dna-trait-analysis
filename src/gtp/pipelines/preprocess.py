@@ -38,13 +38,13 @@ def preprocess_phenotypes(configs: GenotypeToPhenotypeConfigs, verbose=False):
 def _genotype_preprocess_fn(process_item):
     from gtp.tools.simple import convert_bytes
 
-    file_size, _species, pca_csv_path_suffix, save_dir, preprocessor, verbose = (
+    file_size, _species, pca_csv_path_suffix, save_dir, preprocessor, verbose, process_max_rows = (
         process_item
     )
     if verbose:
         print(f"Processing {pca_csv_path_suffix}: {convert_bytes(file_size)} bytes")
-    try:
-        preprocessor.process(pca_csv_path_suffix=pca_csv_path_suffix)
+    try:            
+        preprocessor.process(pca_csv_path_suffix=pca_csv_path_suffix, process_max_rows=process_max_rows)
         preprocessor.save_result(save_dir)
     except Exception as e:
         print(e)
@@ -78,13 +78,19 @@ def preprocess_genotypes(
         output_dir=genotype_output_dir,
         verbose=verbose,
     )
-
+    
+    # Process a subset of the genome for testing
+    process_max_rows = None
+    if configs.experiment.do_subset:
+        process_max_rows = 1000
+    
     process_data = []
 
     # Collect data to be processed
     for species in configs.global_butterfly_metadata.species:
         species_genome_path = Path(f"{species}/{configs.experiment.genotype_scope}")
         for root, dirs, files in os.walk(genotype_input_dir / species_genome_path):
+            print(root)
             for i, f in enumerate(files):
                 fname = f.split(".")[0]
 
@@ -110,7 +116,7 @@ def preprocess_genotypes(
     # Sort by file size. Process smaller files first
     process_data = sorted(process_data, key=lambda x: (x[1], x[0]))
     process_data = [
-        x + [preprocessor, verbose] for x in process_data
+        x + [preprocessor, verbose, process_max_rows] for x in process_data
     ]  # Append preprocessor and verbose variables for compatibility for multiprocessing function
 
     with (
