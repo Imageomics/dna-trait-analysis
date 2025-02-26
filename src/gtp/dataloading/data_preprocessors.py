@@ -62,7 +62,7 @@ class ButterflyGenePreprocessor(DataPreprocessor):
         super().__init__(*args, **kwargs)
         self.genotype_data = None
 
-    def _process_with_pandas(self, pca_csv_path_suffix, verbose=False):
+    def _process_with_pandas(self, pca_csv_path_suffix, verbose=False, process_max_rows=None):
         @profile_exe_time(verbose=False)
         def read_df():
             return pd.read_csv(
@@ -73,6 +73,8 @@ class ButterflyGenePreprocessor(DataPreprocessor):
             )
 
         df = read_df()
+        if process_max_rows:
+            df = df.iloc[:process_max_rows]
 
         def extract_states(x):
             allele_states = [x.split("=")[1].replace("/", "|") for x in x.tolist()]
@@ -128,7 +130,7 @@ class ButterflyGenePreprocessor(DataPreprocessor):
             "ml_ready": ml_ready,
         }
 
-    def _process_with_polars(self, pca_csv_path_suffix, verbose=False):
+    def _process_with_polars(self, pca_csv_path_suffix, verbose=False, process_max_rows=None):
         @profile_exe_time(verbose=False)
         def read_df():
             return pl.read_csv(
@@ -140,6 +142,8 @@ class ButterflyGenePreprocessor(DataPreprocessor):
 
         # Read in DF
         df = read_df()
+        if process_max_rows:
+            df = df[:process_max_rows]
 
         df = df.rename(
             {
@@ -200,7 +204,7 @@ class ButterflyGenePreprocessor(DataPreprocessor):
         }
 
     @profile_exe_time(verbose=False)
-    def _process(self, pca_csv_path_suffix, verbose=False, processor="polars"):
+    def _process(self, pca_csv_path_suffix, verbose=False, processor="polars", process_max_rows=None):
         """
         # of rows = # of positions
         We know that columns 1-4 give global information while columns 5 - END are the states related
@@ -221,9 +225,11 @@ class ButterflyGenePreprocessor(DataPreprocessor):
 
         match processor:
             case "pandas":
-                self._process_with_pandas(pca_csv_path_suffix, verbose=False)
+                self._processor = "pandas"
+                self._process_with_pandas(pca_csv_path_suffix, verbose=False, process_max_rows=process_max_rows)
             case "polars":
-                self._process_with_polars(pca_csv_path_suffix, verbose=False)
+                self._processor = "polars"
+                self._process_with_polars(pca_csv_path_suffix, verbose=False, process_max_rows=process_max_rows)
             case _:
                 raise NotImplementedError(
                     f"{processor} has not been implemented as a processor for {self.__class__.__name__}"
@@ -233,15 +239,25 @@ class ButterflyGenePreprocessor(DataPreprocessor):
     def _save_result(self, path) -> None:
         os.makedirs(path, exist_ok=True)
 
-        csv.write_csv(
-            pa.Table.from_pandas(self.genotype_data["all_info"]),
-            os.path.join(path, "all_info.csv"),
-        )
-        csv.write_csv(
-            pa.Table.from_pandas(self.genotype_data["states"], preserve_index=True),
-            os.path.join(path, "states.csv"),
-        )
+        all_info_path = os.path.join(path, "all_info.csv")
+        states_path = os.path.join(path, "states.csv")
+        match self._processor:
+            case "pandas":
+                csv.write_csv(
+                    pa.Table.from_pandas(self.genotype_data["all_info"]),
+                    all_info_path,
+                )
+                csv.write_csv(
+                    pa.Table.from_pandas(self.genotype_data["states"], preserve_index=True),
+                    states_path,
+                )
+            case "polars":
+                self.genotype_data["all_info"].write_csv(all_info_path, separator=",")
+                self.genotype_data["states"].write_csv(states_path, separator=",")
+            case _:
+                raise NotImplementedError(f"{self._processor} has not been implemented as a processor in {self.__class__.__name__}")
         # self.genotype_data["all_info"].to_csv(os.path.join(path, "all_info.csv"), index=False)
         # self.genotype_data["states"].to_csv(os.path.join(path, "states.csv"), index=True)
         np.save(os.path.join(path, "camids.npy"), self.genotype_data["camids"])
         np.save(os.path.join(path, "ml_ready.npy"), self.genotype_data["ml_ready"])
+        np.save(os.path.join(path, "positions.npy"), self.genotype_data["positions"])

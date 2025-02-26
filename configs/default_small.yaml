@@ -6,14 +6,14 @@ io: # input / output configurations
         phenotype: "dna/colors"
     data_post_process: # where post processed raw data will be
         root: null
-        genotype: "dna/processed/genotypes"
+        genotype: "dna/processed_sm/genotypes"
         phenotype: "dna/processed/phenotypes"
     results:
         root: null
-        training_metadata: "dna/metadata"
-        training_output: "dna/training_output"
-        plot_output: "dna/plot_results"
-        epistasis_output: "dna/epistasis_output"
+        training_metadata: "dna/metadata_sm"
+        training_output: "dna/training_output_sm"
+        plot_output: "dna/plot_results_sm"
+        epistasis_output: "dna/epistasis_output_sm"
 global_butterfly_metadata:
     species: ["erato", "melpomene"]
     wings: ["forewings", "hindwings"]
@@ -21,7 +21,7 @@ global_butterfly_metadata:
     number_of_chromosomes: 21
 experiment:
     genotype_scope: "genome" # Either 'genome', 'chromosomes', 'genes'
-    do_subset: false # Whether or not to create a subset of the original data for testing purposes.
+    do_subset: true # Whether or not to create a subset of the original data for testing purposes.
 training:
     train_ratio: 0.8
     validation_ratio: 0.1
