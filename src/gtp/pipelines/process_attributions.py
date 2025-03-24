@@ -14,7 +14,12 @@ from gtp.dataloading.data_collectors import load_training_data
 from gtp.dataloading.datasets import GTP_Dataset
 from gtp.dataloading.path_collectors import get_experiment_directory
 from gtp.dataloading.tools import save_json
-from gtp.evaluation import AttributionMethod, get_lrp_attr, get_perturb_attr
+from gtp.evaluation import (
+    AttributionMethod,
+    get_lrp_attr,
+    get_perturb_attr,
+    get_windowed_edit_attr,
+)
 from gtp.models.net import SoyBeanNet
 from gtp.options.process_attribution import ProcessAttributionOptions
 from gtp.tools.calculation import gather_model_predictions_and_actuals
@@ -87,22 +92,37 @@ def _process_chromosome(
             for idx in range(options.out_dims_attribution)
         ]
 
-        if options.attr_method == AttributionMethod.LRP.value:
-            attribution_data = get_lrp_attr(
-                model,
-                dloader,
-                targets=targets,
-                verbose=options.verbose,
-                num_processes=8,
-            )
-        elif options.attr_method == AttributionMethod.PERTURB.value:
-            attribution_data = get_perturb_attr(
-                model, dloader, targets=targets, verbose=options.verbose
-            )
-        else:
-            raise NotImplementedError(
-                f"{options.attr_method} is not an implemented attribution method."
-            )
+        match options.attr_method:
+            case AttributionMethod.LRP.value:
+                attribution_data = get_lrp_attr(
+                    model,
+                    dloader,
+                    targets=targets,
+                    verbose=options.verbose,
+                    num_processes=8,
+                )
+            case AttributionMethod.PERTURB.value:
+                attribution_data = get_perturb_attr(
+                    model, dloader, targets=targets, verbose=options.verbose
+                )
+            case AttributionMethod.WINDOWED_EDITING.value:
+                edits = [
+                    torch.tensor([0, 0, 1]),  # AA
+                    torch.tensor([0, 1, 0]),  # Aa/aA
+                    torch.tensor([1, 0, 0]),  # aa
+                    torch.tensor([0, 0, 0]),  # zero-out
+                ]
+                attribution_data = get_windowed_edit_attr(
+                    model,
+                    dloader,
+                    edits=edits,
+                    window=options.window_size,
+                    verbose=options.verbose,
+                )
+            case _:
+                raise NotImplementedError(
+                    f"{options.attr_method} is not an implemented attribution method."
+                )
 
         eval_stats = _get_evaluation_metrics(model, dloader)
         save_json(eval_stats, experiment_dir / f"{phase_str}_metrics.json")
