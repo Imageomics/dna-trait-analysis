@@ -1,6 +1,7 @@
+from collections import defaultdict
 import os
-from multiprocessing import Pool
 from enum import Enum
+import math
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +17,9 @@ from gtp.models.forward import forward_step
 class AttributionMethod(Enum):
     LRP = "lrp"  # Layerwise Relevance Propagation
     PERTURB = "perturb"  # Perturbation on the DNA input states
+    WINDOWED_EDITING = (
+        "windowed_editing"  # Do windowed edits and record the magnitude of PCA change
+    )
 
 
 def test(tr_dloader, val_dloader, test_dloader, model, out_dims, out_dims_start_idx=0):
@@ -238,6 +242,85 @@ def get_perturb_attr(m, dloader, targets=0, distance_fn="l1", verbose=False):
 
     averaged_max_changes = all_max_changes.mean(0)  # D
     return averaged_max_changes
+
+
+def get_windowed_edit_attr(m, dloader, edits, window=0, verbose=False):
+    """This attribution method will record the change in the output (y) when changing the state of the input at each
+    feature location and a window around that location.
+
+    Args:
+        m (_type_): The predictive model
+        dloader (_type_): The dataloader that returns the intput X and output y
+        edits (_type_): A list of edits to make. A list of attributions will be returned per edit option
+        window (int): The window radius to edit. If 1000, then edits will be made 1000 positions above and 1000 positions below the central location.
+        verbose (bool, optional): Set True if everything is to be printed. Defaults to False.
+
+    Returns:
+        _type_: The resulting attributions per input dimension D
+    """
+    m.eval()
+
+    def get_edit_loc(edit_num, chromosome_length):
+        edit_loc = min((edit_num * window * 2) + window, chromosome_length)
+        return edit_loc
+
+    change_tracker = defaultdict(list)
+    with torch.no_grad():
+        for batch in tqdm(
+            dloader,
+            desc="Collecting Batched Edits",
+            leave=True,
+            position=2,
+            disable=not verbose,
+        ):
+            data, pca = batch
+
+            input_x = data.cuda()
+            org_model_pca_output = m(input_x)
+
+            chromosome_length = input_x.shape[2]
+            num_of_edits = math.ceil(chromosome_length / (window * 2))
+            for edit_num in tqdm(
+                range(num_of_edits),
+                desc="recording changes",
+                colour="#8822CC",
+                leave=False,
+                position=1,
+                disable=not verbose,
+            ):
+                edit_loc = get_edit_loc(edit_num, chromosome_length)
+                edited_input_x = input_x.detach().clone()
+                for ei, edit_value in enumerate(edits):
+                    change_tracker[edit_loc].append([])
+                    edit_vec = edit_value.detach().clone()
+                    if window != 0:
+                        min_idx = max(0, edit_loc - window)
+                        max_idx = min(edited_input_x.shape[2], edit_loc + window)
+                        edit_vec = edit_vec.unsqueeze(0).repeat(max_idx - min_idx, 1)
+
+                    if window == 0:
+                        edited_input_x[:, 0, edit_loc] = edit_vec
+                    else:
+                        edited_input_x[:, 0, min_idx:max_idx] = edit_vec
+
+                    edited_model_pca_output = m(edited_input_x)
+                    diff = (
+                        (edited_model_pca_output - org_model_pca_output)
+                        .detach()
+                        .cpu()
+                        .numpy()
+                    )
+                    change_tracker[edit_loc][ei].append(diff)
+
+        # Stack tensors
+        for edit_num in range(num_of_edits):
+            edit_loc = get_edit_loc(edit_num, chromosome_length)
+            for ei, edit_value in enumerate(edits):
+                change_tracker[edit_loc][ei] = np.concatenate(
+                    change_tracker[edit_loc][ei], axis=0
+                )
+
+    return change_tracker
 
 
 # TODO: need to refactor, don't need new_new
