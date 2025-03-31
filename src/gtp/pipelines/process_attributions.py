@@ -82,6 +82,12 @@ def _process_chromosome(
         (val_data, "validation"),
         (test_data, "test"),
     ]:
+        attribution_save_path = experiment_dir / f"{phase_str}_{options.attr_method}_attributions.npy"
+        
+        # Skip if already calculated
+        if not options.force_reprocess and os.path.exists(attribution_save_path):
+            continue
+        
         dset = GTP_Dataset(*data)
         dloader = DataLoader(
             dset, batch_size=options.batch_size, num_workers=options.num_workers
@@ -127,7 +133,7 @@ def _process_chromosome(
         eval_stats = _get_evaluation_metrics(model, dloader)
         save_json(eval_stats, experiment_dir / f"{phase_str}_metrics.json")
         np.save(
-            experiment_dir / f"{phase_str}_{options.attr_method}_attributions.npy",
+            attribution_save_path,
             attribution_data,
         )
 
