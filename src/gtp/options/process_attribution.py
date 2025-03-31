@@ -24,4 +24,5 @@ class ProcessAttributionOptions(BaseOptions):
     wing: str = "forewings"
     exp_name: str = "debug"
     verbose: bool = False
+    force_reprocess: bool = False
     process_all: bool = False
