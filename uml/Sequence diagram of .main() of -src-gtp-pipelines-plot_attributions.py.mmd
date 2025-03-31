@@ -1,0 +1,121 @@
+
+%%{init: {'theme':'forest'}}%%
+
+sequenceDiagram
+
+    Title Sequence diagram of .main() of /src/gtp/pipelines/plot_attributions.py
+
+    participant p1 as main()<br>:pipelines/plot_attributions.py/plot_attributions.py
+    participant p2 as PlotAttributionOptions<br>:options/base.py/BaseOptions
+    participant p3 as <br>:configs/loaders.py/loaders.py
+    participant p4 as <br>:pipelines/plot_attributions.py/plot_attributions.py
+    participant p5 as <br>:dataloading/path_collectors.py/path_collectors.py
+    participant p6 as <br>:tools/simple.py/simple.py
+    participant p7 as <br>:dataloading/tools.py/tools.py
+    participant p8 as <br>:tools/timing.py/timing.py
+
+
+	p1 ->>+ p2: 1: click_options()
+	p2 -->>- p1: 1: return value
+	p1 ->>+ p3: 2: load_configs(configs)
+	p3 -->>- p1: 2: return value
+	p1 ->>+ p4: 3: plot_all(cfgs, opts)
+	p4 ->>+ p4: 3.1: plot(configs=configs, options=options)
+	p4 ->>+ p4: 3.1.1: create_manhattan_plot_static_matplotlib(configs, options)
+	p4 ->>+ p4: 3.1.1.1: _process_genome(configs, options)
+	p4 ->>+ p4: 3.1.1.1.1: _process_chromosome( configs, options, chromosome=c<br>hromosome )
+	Note right of p4: Further calls ignored for reaching max depth
+	p4 -->>- p4: 3.1.1.1.1: return value
+	p4 -->>- p4: 3.1.1.1: return value
+	p4 ->>+ p4: 3.1.1.2: _process_chromosome(configs, options)
+	p4 ->>+ p5: 3.1.1.2.1: get_results_training_output_directory(configs.io)
+	Note right of p5: Further calls ignored for reaching max depth
+	p5 -->>- p4: 3.1.1.2.1: return value
+	p4 ->>+ p6: 3.1.1.2.2: create_exp_info_text( species=options.species,<br>wing=options.wing,<br>color=options.color,<br>chromosome=options.chromosome,<br> )
+	p6 -->>- p4: 3.1.1.2.2: return value
+	p4 ->>+ p7: 3.1.1.2.3: load_json(experiment_dir / "training_metrics.<br>json")
+	p7 -->>- p4: 3.1.1.2.3: return value
+	p4 ->>+ p7: 3.1.1.2.4: load_json(experiment_dir / "validation_metrics.<br>json")
+	p7 -->>- p4: 3.1.1.2.4: return value
+	p4 ->>+ p7: 3.1.1.2.5: load_json(experiment_dir / "test_metrics.json")
+	p7 -->>- p4: 3.1.1.2.5: return value
+	p4 ->>+ p5: 3.1.1.2.6: get_post_processed_genotype_directory(configs.io)
+	Note right of p5: Further calls ignored for reaching max depth
+	p5 -->>- p4: 3.1.1.2.6: return value
+	p4 ->>+ p7: 3.1.1.2.7: collect_chromosome_position_metadata( genotype_folder / configs.experiment.<br>.genotype_scope, options.species,<br>,        options.chromosome,<br>)
+	Note right of p7: Further calls ignored for reaching max depth
+	p7 -->>- p4: 3.1.1.2.7: return value
+	p4 -->>- p4: 3.1.1.2: return value
+	p4 ->>+ p4: 3.1.1.3: _plot_manhattan_plot_static_matplotlib( configs=configs,<br>options=options,<br>train_df=train_df,<br>val_df=val_df,<br>test_df=test_df,<br>metrics=metrics,<br>y_val=tgt_y_val, )
+	p4 ->>+ p4: 3.1.1.3.1: do_neg_log_on_bar_y()
+	p4 -->>- p4: 3.1.1.3.1: return value
+	p4 ->>+ p4: 3.1.1.3.2: do_neg_log_on_bar_y()
+	p4 -->>- p4: 3.1.1.3.2: return value
+	p4 -->>- p4: 3.1.1.3: return value
+	p4 ->>+ p5: 3.1.1.4: get_results_plot_output_directory(configs.io)
+	p5 ->>+ p5: 3.1.1.4.1: _select_override_if_exists(io_cfgs.default_root, io_cfgs.<br>results.root)
+	p5 -->>- p5: 3.1.1.4.1: return value
+	p5 -->>- p4: 3.1.1.4: return value
+	p4 -->>- p4: 3.1.1: return value
+	p4 -->>- p4: 3.1: return value
+	p4 -->>- p1: 3: return value
+	p1 ->>+ p4: 4: plot(cfgs, opts)
+	p4 ->>+ p4: 4.1: create_manhattan_plot_static_matplotlib(configs, options)
+	p4 ->>+ p4: 4.1.1: _process_genome(configs, options)
+	p4 ->>+ p4: 4.1.1.1: _process_chromosome( configs, options, chromosome=c<br>hromosome )
+	p4 ->>+ p5: 4.1.1.1.1: get_results_training_output_directory(configs.io)
+	Note right of p5: Further calls ignored for reaching max depth
+	p5 -->>- p4: 4.1.1.1.1: return value
+	p4 ->>+ p6: 4.1.1.1.2: create_exp_info_text( species=options.species,<br>wing=options.wing,<br>color=options.color,<br>chromosome=options.chromosome,<br> )
+	p6 -->>- p4: 4.1.1.1.2: return value
+	p4 ->>+ p7: 4.1.1.1.3: load_json(experiment_dir / "training_metrics.<br>json")
+	p7 -->>- p4: 4.1.1.1.3: return value
+	p4 ->>+ p7: 4.1.1.1.4: load_json(experiment_dir / "validation_metrics.<br>json")
+	p7 -->>- p4: 4.1.1.1.4: return value
+	p4 ->>+ p7: 4.1.1.1.5: load_json(experiment_dir / "test_metrics.json")
+	p7 -->>- p4: 4.1.1.1.5: return value
+	p4 ->>+ p5: 4.1.1.1.6: get_post_processed_genotype_directory(configs.io)
+	Note right of p5: Further calls ignored for reaching max depth
+	p5 -->>- p4: 4.1.1.1.6: return value
+	p4 ->>+ p7: 4.1.1.1.7: collect_chromosome_position_metadata( genotype_folder / configs.experiment.<br>.genotype_scope, options.species,<br>,        options.chromosome,<br>)
+	Note right of p7: Further calls ignored for reaching max depth
+	p7 -->>- p4: 4.1.1.1.7: return value
+	p4 -->>- p4: 4.1.1.1: return value
+	p4 -->>- p4: 4.1.1: return value
+	p4 ->>+ p4: 4.1.2: _process_chromosome(configs, options)
+	p4 ->>+ p5: 4.1.2.1: get_results_training_output_directory(configs.io)
+	p5 ->>+ p5: 4.1.2.1.1: _select_override_if_exists(io_cfgs.default_root, io_cfgs.<br>results.root)
+	p5 -->>- p5: 4.1.2.1.1: return value
+	p5 -->>- p4: 4.1.2.1: return value
+	p4 ->>+ p6: 4.1.2.2: create_exp_info_text( species=options.species,<br>wing=options.wing,<br>color=options.color,<br>chromosome=options.chromosome,<br> )
+	p6 -->>- p4: 4.1.2.2: return value
+	p4 ->>+ p7: 4.1.2.3: load_json(experiment_dir / "training_metrics.<br>json")
+	p7 -->>- p4: 4.1.2.3: return value
+	p4 ->>+ p7: 4.1.2.4: load_json(experiment_dir / "validation_metrics.<br>json")
+	p7 -->>- p4: 4.1.2.4: return value
+	p4 ->>+ p7: 4.1.2.5: load_json(experiment_dir / "test_metrics.json")
+	p7 -->>- p4: 4.1.2.5: return value
+	p4 ->>+ p5: 4.1.2.6: get_post_processed_genotype_directory(configs.io)
+	p5 ->>+ p5: 4.1.2.6.1: _select_override_if_exists( io_cfgs.default_root,<br>io_cfgs.data_post_process.root<br> )
+	p5 -->>- p5: 4.1.2.6.1: return value
+	p5 -->>- p4: 4.1.2.6: return value
+	p4 ->>+ p7: 4.1.2.7: collect_chromosome_position_metadata( genotype_folder / configs.experiment.<br>.genotype_scope, options.species,<br>,        options.chromosome,<br>)
+	p7 ->>+ p8: 4.1.2.7.1: profile_exe_time(verbose=False)
+	p8 -->>- p7: 4.1.2.7.1: return value
+	p7 ->>+ p7: 4.1.2.7.2: get_chromosome_scaffolds( root=root, species=species,<br>chromosome=chromosome )
+	p7 -->>- p7: 4.1.2.7.2: return value
+	p7 -->>- p4: 4.1.2.7: return value
+	p4 -->>- p4: 4.1.2: return value
+	p4 ->>+ p4: 4.1.3: _plot_manhattan_plot_static_matplotlib( configs=configs,<br>options=options,<br>train_df=train_df,<br>val_df=val_df,<br>test_df=test_df,<br>metrics=metrics,<br>y_val=tgt_y_val, )
+	p4 ->>+ p4: 4.1.3.1: do_neg_log_on_bar_y()
+	p4 -->>- p4: 4.1.3.1: return value
+	p4 ->>+ p4: 4.1.3.2: do_neg_log_on_bar_y()
+	p4 -->>- p4: 4.1.3.2: return value
+	p4 -->>- p4: 4.1.3: return value
+	p4 ->>+ p5: 4.1.4: get_results_plot_output_directory(configs.io)
+	p5 ->>+ p5: 4.1.4.1: _select_override_if_exists(io_cfgs.default_root, io_cfgs.<br>results.root)
+	p5 -->>- p5: 4.1.4.1: return value
+	p5 -->>- p4: 4.1.4: return value
+	p4 -->>- p4: 4.1: return value
+	p4 -->>- p1: 4: return value
+        

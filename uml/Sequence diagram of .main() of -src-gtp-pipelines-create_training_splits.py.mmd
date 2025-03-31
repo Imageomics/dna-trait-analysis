@@ -1,0 +1,26 @@
+
+%%{init: {'theme':'forest'}}%%
+
+sequenceDiagram
+
+    Title Sequence diagram of .main() of /src/gtp/pipelines/create_training_splits.py
+
+    participant p1 as main()<br>:pipelines/create_training_splits.py/create_training_splits.py
+    participant p2 as <br>:configs/loaders.py/loaders.py
+    participant p3 as <br>:pipelines/create_training_splits.py/create_training_splits.py
+    participant p4 as <br>:dataloading/path_collectors.py/path_collectors.py
+
+
+	p1 ->>+ p2: 1: load_configs(configs)
+	p2 -->>- p1: 1: return value
+	p1 ->>+ p3: 2: create_training_splits(configs=cfgs, verbose=verbose)
+	p3 ->>+ p4: 2.1: get_post_processed_genotype_directory(configs.io)
+	p4 ->>+ p4: 2.1.1: _select_override_if_exists( io_cfgs.default_root,<br>io_cfgs.data_post_process.root<br> )
+	p4 -->>- p4: 2.1.1: return value
+	p4 -->>- p3: 2.1: return value
+	p3 ->>+ p4: 2.2: get_results_training_metadata_directory(configs.io)
+	p4 ->>+ p4: 2.2.1: _select_override_if_exists(io_cfgs.default_root, io_cfgs.<br>results.root)
+	p4 -->>- p4: 2.2.1: return value
+	p4 -->>- p3: 2.2: return value
+	p3 -->>- p1: 2: return value
+        
