@@ -1,14 +1,15 @@
-exp_name=pca_10
+exp_name=pca_10_deepnet
 species_list="erato melpomene"
 color_list="color_3 total color_1 color_2"
 wing_list="forewings hindwings"
 epochs=50
+model=deepnet
 batch_size=32
 start_chromosome=1
 end_chromosome=21
 out_dims=10
 out_dims_start_idx=0
-available_gpus=(1 2 3 4)
+available_gpus=(1 2 3 5)
 
 commands_to_execute=()
 for wing in $wing_list
@@ -29,6 +30,7 @@ do
                 cmd="${cmd} --exp_name ${exp_name}"
                 cmd="${cmd} --out_dims ${out_dims}"
                 cmd="${cmd} --out_dims_start_idx ${out_dims_start_idx}"
+                cmd="${cmd} --model ${model}"
                 commands_to_execute=("${commands_to_execute[@]}" "${cmd}")
             done
         done

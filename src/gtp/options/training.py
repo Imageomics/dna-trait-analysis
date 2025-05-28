@@ -11,6 +11,7 @@ class TrainingOptions(BaseOptions):
     drop_out_prob: float = 0.75
     out_dims: int = 1
     out_dims_start_idx: int = 0
+    model: str = "soybean"
     insize: int = 3
     hidden_dim: int = 10
     seed: int = 2
