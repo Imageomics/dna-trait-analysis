@@ -1,5 +1,6 @@
 import math
 
+import torch
 import torch.nn as nn
 
 
@@ -375,3 +376,61 @@ class ConvNet(nn.Module):
         # print(x.shape)
         x = self.fc(x)
         return x
+
+
+class DeepNet(nn.Module):
+    def __init__(
+        self,
+        window_size=200,
+        num_out_dims=10,
+        insize=4,
+        hidden_dim=10,
+        drop_out_prob=0.75,
+    ):
+        super().__init__()
+
+        self.in_stride = 100
+        self.in_block = nn.Sequential(
+            nn.Conv2d(
+                1,
+                16,
+                kernel_size=(self.in_stride, insize),
+                padding=0,
+                stride=self.in_stride,
+            ),
+            nn.Tanh(),
+        )
+
+        length_of_feature = (
+            window_size + window_size % self.in_stride
+        ) // self.in_stride
+
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(
+                16,
+                32,
+                kernel_size=(100, 1),
+                padding="same",
+                stride=1,
+            ),
+            nn.LeakyReLU(0.2),
+            nn.Conv2d(
+                32,
+                32,
+                kernel_size=(100, 1),
+                padding=0,
+                stride=100,
+            ),
+            nn.LeakyReLU(0.2),
+        )
+
+        length_of_feature = length_of_feature // 100
+
+        num_features = length_of_feature * 32
+        self.fc = nn.Linear(num_features, num_out_dims)
+
+    def forward(self, x):
+        h = self.in_block(x)
+        h = self.layer1(h)
+        h = torch.flatten(h, 1)
+        return self.fc(h)

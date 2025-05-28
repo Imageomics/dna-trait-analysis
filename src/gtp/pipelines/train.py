@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 from scipy.stats import pearsonr
 from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
+from tqdm import tqdm
 
 from gtp.configs.loaders import load_configs
 from gtp.configs.project import GenotypeToPhenotypeConfigs
@@ -17,7 +17,7 @@ from gtp.dataloading.data_collectors import load_training_data
 from gtp.dataloading.datasets import GTP_Dataset
 from gtp.dataloading.path_collectors import get_results_training_output_directory
 from gtp.evaluation import test
-from gtp.models.net import SoyBeanNet
+from gtp.models.net import SoyBeanNet, DeepNet
 from gtp.models.scheduler import Scheduler
 from gtp.options.training import TrainingOptions
 from gtp.tools.calculation import calc_pvalue_linear, filter_topk_snps
@@ -59,8 +59,8 @@ def calc_pearson_correlation(model, dloader):
                 predicted.extend([[] for _ in range(pca.shape[1])])
             out = model(data.cuda())
             for d in range(pca.shape[1]):
-                actual[d].extend(pca[:, 0].detach().cpu().numpy().tolist())
-                predicted[d].extend(out[:, 0].detach().cpu().numpy().tolist())
+                actual[d].extend(pca[:, d].detach().cpu().numpy().tolist())
+                predicted[d].extend(out[:, d].detach().cpu().numpy().tolist())
 
     pearson_stats = []
     for act, pred in zip(actual, predicted):
@@ -145,7 +145,12 @@ def train_model(
     val_pearsons = []
     training_loop = BasicTrainingLoop(options=None)
     training_tracker = DNATrainingTracker()
-    for epoch in tqdm(range(options.epochs), desc="Training", colour="green"):
+    for epoch in tqdm(
+        range(options.epochs),
+        desc="Training",
+        colour="green",
+        disable=not options.verbose,
+    ):
         # Training
         model.train()
         training_loop.train(
@@ -257,13 +262,28 @@ def train(configs: GenotypeToPhenotypeConfigs, options: TrainingOptions):
     )
 
     start_t = time.perf_counter()
-    model = SoyBeanNet(
-        window_size=num_vcfs,
-        num_out_dims=options.out_dims,
-        insize=options.insize,
-        hidden_dim=options.hidden_dim,
-        drop_out_prob=options.drop_out_prob,
-    ).cuda()
+    match options.model:
+        case "soybean":
+            model = SoyBeanNet(
+                window_size=num_vcfs,
+                num_out_dims=options.out_dims,
+                insize=options.insize,
+                hidden_dim=options.hidden_dim,
+                drop_out_prob=options.drop_out_prob,
+            ).cuda()
+        case "deepnet":
+            model = DeepNet(
+                window_size=num_vcfs,
+                num_out_dims=options.out_dims,
+                insize=options.insize,
+                hidden_dim=options.hidden_dim,
+                drop_out_prob=options.drop_out_prob,
+            ).cuda()
+
+        case _:
+            raise NotImplementedError(
+                f"{options.model} is not a valid model. Please implement it or give a different option."
+            )
 
     # Train the model
     train_losses, val_losses, val_pearsons = train_model(
