@@ -175,6 +175,15 @@ def align_genotype_and_phenotype_data(
     phenotype_camids_aligned = phenotype_camids[~idx]
     phenotype_data_aligned = phenotype_data[~idx]
 
+    # Sort
+    sort_idx = np.argsort(phenotype_camids_aligned)
+    phenotype_camids_aligned = phenotype_camids_aligned[sort_idx]
+    phenotype_data_aligned = phenotype_data_aligned[sort_idx]
+
+    sort_idx = np.argsort(genotype_camids_aligned)
+    genotype_camids_aligned = genotype_camids_aligned[sort_idx]
+    genotype_data_aligned = genotype_data_aligned[sort_idx]
+
     assert (phenotype_camids_aligned == genotype_camids_aligned).all(), (
         "Invalid alignment"
     )
