@@ -3,9 +3,7 @@ Goal: to find associations between dna data and visual traits.
 
 # Installation
 ```
-conda create -n gtp python=3.10
-conda activate gtp
-pip install -e .
+uv sync
 ```
 
 # Set Options
@@ -16,7 +14,7 @@ To personalize options can either:
 # Run Tests
 To run tests, run the follwing command:
 ```
-pytest tests
+uv run pytest tests
 ```
 
 NOTE: these tests depend on the current configs and may need to be adjusted for your development environment.
@@ -26,8 +24,8 @@ To preprocess the Data, you can either:
 - Run the notebook in ```notebooks/preprocess_pipeline.ipynb```.
 - Or, run the commands:
 ```
-python -m gtp.pipelines.preprocess --method phenotype
-python -m gtp.pipelines.preprocess --method genotype
+uv run python -m gtp.pipelines.preprocess --method phenotype
+uv run python -m gtp.pipelines.preprocess --method genotype
 ```
 
 NOTE: preprocessing genotype data takes a long time. You can add the ```num-processes``` argument to the command to help speed this up. 4 by default. Do not be fooled by the initial processing speed as smaller files are processed first.
@@ -35,19 +33,19 @@ NOTE: preprocessing genotype data takes a long time. You can add the ```num-proc
 # Create Data Splits
 To keep data splits consistent across runs, precompute the splits with the following command:
 ```
-python -m gtp.pipelines.create_training_splits
+uv run python -m gtp.pipelines.create_training_splits
 ```
 
 # Training the Model
 Run the following command:
 ```
-python -m gtp.pipelines.train --chromosome 18 --species erato --color color_3 --wing forewings --epochs 100 --batch_size 32 --exp_name debug
+uv run python -m gtp.pipelines.train --chromosome 18 --species erato --color color_3 --wing forewings --epochs 100 --batch_size 32 --exp_name debug
 ```
 
 # Calculate Attributions
 To calculate the attributions of a single chromosome or entire genome (depending on configs: see `experiment.genotype_scope`), run the following command:
 ```
-python -m gtp.pipelines.process_attributions --species erato --color color_3 --wing forewings --exp_name debug
+uv run python -m gtp.pipelines.process_attributions --species erato --color color_3 --wing forewings --exp_name debug
 ```
 
 NOTE: you have to have trained a model for every chromosome for a species in order for the above command to work on the entire genome. Otherwise, it'll only plot / calculate data for chromosomes with a trained model.
@@ -55,7 +53,7 @@ NOTE: you have to have trained a model for every chromosome for a species in ord
 # Plot Attributions
 To plot the attributions of a single chromosome or entire genome (depending on configs: see `experiment.genotype_scope`), run the following command:
 ```
-python -m gtp.pipelines.plot_attributions --species erato --color color_3 --wing forewings --exp_name debug
+uv run python -m gtp.pipelines.plot_attributions --species erato --color color_3 --wing forewings --exp_name debug
 ```
 
 NOTE: you have to have trained a model for every chromosome for a species in order for the above command to work on the entire genome. Otherwise, it'll only plot / calculate data for chromosomes with a trained model.
