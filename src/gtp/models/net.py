@@ -401,9 +401,13 @@ class DeepNet(nn.Module):
             nn.Tanh(),
         )
 
-        length_of_feature = (
-            window_size + window_size % self.in_stride
-        ) // self.in_stride
+        length_of_feature = calc_feature_size(
+            input_size=window_size,
+            kernel_size=self.in_stride,
+            padding=0,
+            dialation=1,
+            stride=self.in_stride,
+        )
 
         self.layer1 = nn.Sequential(
             nn.Conv2d(
@@ -424,10 +428,94 @@ class DeepNet(nn.Module):
             nn.LeakyReLU(0.2),
         )
 
-        length_of_feature = length_of_feature // 100
+        length_of_feature = calc_feature_size(
+            input_size=length_of_feature,
+            kernel_size=100,
+            padding=0,
+            dialation=1,
+            stride=100,
+        )
 
         num_features = length_of_feature * 32
         self.fc = nn.Linear(num_features, num_out_dims)
+
+    def forward(self, x):
+        h = self.in_block(x)
+        h = self.layer1(h)
+        h = torch.flatten(h, 1)
+        return self.fc(h)
+
+
+def calc_feature_size(input_size, kernel_size, padding, dialation, stride):
+    ps = 2 * padding
+    ds = dialation * (kernel_size - 1)
+    numerator = input_size + ps - ds - 1
+    denominator = stride
+    return math.floor(numerator / denominator + 1)
+
+
+class DeepNet2(nn.Module):
+    def __init__(self, window_size=200, num_out_dims=10, insize=4):
+        super().__init__()
+
+        kernel_length = 100
+        stride = kernel_length // 2
+
+        self.in_block = nn.Sequential(
+            nn.Conv2d(
+                1,
+                16,
+                kernel_size=(kernel_length, insize),
+                padding=0,
+                stride=stride,
+            ),
+            nn.LeakyReLU(0.2),
+        )
+
+        length_of_feature = calc_feature_size(
+            input_size=window_size,
+            kernel_size=kernel_length,
+            padding=0,
+            dialation=1,
+            stride=stride,
+        )
+
+        layer_configs = [
+            (16, 32, 50, 10),
+            (32, 64, 20, 2),
+            (64, 64, 20, 2),
+            (64, 64, 10, 2),
+            (64, 32, 3, 2),
+        ]
+        modules = []
+        for in_channels, out_channels, kernel_size, stride in layer_configs:
+            modules.append(
+                nn.Conv2d(
+                    in_channels,
+                    out_channels,
+                    kernel_size=(kernel_size, 1),
+                    padding=0,
+                    stride=stride,
+                )
+            )
+            modules.append(nn.LeakyReLU(0.2))
+
+            length_of_feature = calc_feature_size(
+                input_size=length_of_feature,
+                kernel_size=kernel_size,
+                padding=0,
+                dialation=1,
+                stride=stride,
+            )
+
+        self.layer1 = nn.Sequential(*modules)
+
+        num_features = length_of_feature * layer_configs[-1][1]
+        self.fc = nn.Sequential(
+            nn.Linear(num_features, 500),
+            nn.ReLU(),
+            nn.Linear(500, num_out_dims),
+        )
 
     def forward(self, x):
         h = self.in_block(x)

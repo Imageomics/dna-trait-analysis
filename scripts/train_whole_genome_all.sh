@@ -1,15 +1,15 @@
-exp_name=pca_10_deepnet
+exp_name=deepnet_7_17
 species_list="erato melpomene"
 color_list="color_3 total color_1 color_2"
 wing_list="forewings hindwings"
-epochs=50
+epochs=100
 model=deepnet
 batch_size=32
 start_chromosome=1
 end_chromosome=21
-out_dims=10
+out_dims=1
 out_dims_start_idx=0
-available_gpus=(1 2 3 5)
+available_gpus=(3)
 
 commands_to_execute=()
 for wing in $wing_list
@@ -20,7 +20,7 @@ do
         do
             for chromosome in $(seq $start_chromosome $end_chromosome)
             do
-                cmd="python -m gtp.pipelines.train"
+                cmd="uv run python -m gtp.pipelines.train"
                 cmd="${cmd} --color ${color}"
                 cmd="${cmd} --wing ${wing}"
                 cmd="${cmd} --species ${species}"

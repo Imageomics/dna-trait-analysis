@@ -31,6 +31,9 @@ def preprocess_phenotypes(configs: GenotypeToPhenotypeConfigs, verbose=False):
         colour="blue",
     ):
         suffix_path = f"{species}_{wing}_PCA/PCA_{phenotype}_loadings.csv"
+        if wing == "hindwings":
+            suffix_path = f"{species}_{wing}_PCA{configs.io.raw_data_input.phenotype_variant}/PCA_{phenotype}_loadings.csv"
+
         preprocessor.process(pca_csv_path_suffix=suffix_path)
         preprocessor.save_result(f"{species}_{wing}_{phenotype}")
 
@@ -38,13 +41,21 @@ def preprocess_phenotypes(configs: GenotypeToPhenotypeConfigs, verbose=False):
 def _genotype_preprocess_fn(process_item):
     from gtp.tools.simple import convert_bytes
 
-    file_size, _species, pca_csv_path_suffix, save_dir, preprocessor, verbose, process_max_rows = (
-        process_item
-    )
+    (
+        file_size,
+        _species,
+        pca_csv_path_suffix,
+        save_dir,
+        preprocessor,
+        verbose,
+        process_max_rows,
+    ) = process_item
     if verbose:
         print(f"Processing {pca_csv_path_suffix}: {convert_bytes(file_size)} bytes")
-    try:            
-        preprocessor.process(pca_csv_path_suffix=pca_csv_path_suffix, process_max_rows=process_max_rows)
+    try:
+        preprocessor.process(
+            pca_csv_path_suffix=pca_csv_path_suffix, process_max_rows=process_max_rows
+        )
         preprocessor.save_result(save_dir)
     except Exception as e:
         print(e)
@@ -78,12 +89,12 @@ def preprocess_genotypes(
         output_dir=genotype_output_dir,
         verbose=verbose,
     )
-    
+
     # Process a subset of the genome for testing
     process_max_rows = None
     if configs.experiment.do_subset:
         process_max_rows = 1000
-    
+
     process_data = []
 
     # Collect data to be processed
