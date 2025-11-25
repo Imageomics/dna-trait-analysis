@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Union
 
 from gtp.options.base import BaseOptions
 
@@ -16,7 +17,7 @@ class TrainingOptions(BaseOptions):
     hidden_dim: int = 10
     seed: int = 2
     species: str = "erato"
-    chromosome: int = 1
+    chromosome: Union[str, int] = 1
     top_k_chromosome_training: bool = False
     top_k_chromosome_training_path: str = False
     color: str = "total"
@@ -26,4 +27,4 @@ class TrainingOptions(BaseOptions):
     force_retrain: bool = False
     scheduler: str = "none"
     optimizer: str = "adam"
-    save_stat: str = "pearson"
+    save_stat: str = "r2"

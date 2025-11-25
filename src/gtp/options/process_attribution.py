@@ -18,8 +18,9 @@ class ProcessAttributionOptions(BaseOptions):
     )
     insize: int = 3
     hidden_dim: int = 10
+    model: str = "soybean"
     species: str = "erato"
-    chromosome: int = 1
+    chromosome: int | str = ""
     color: str = "total"
     wing: str = "forewings"
     exp_name: str = "debug"

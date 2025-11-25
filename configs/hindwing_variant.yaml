@@ -4,11 +4,11 @@ io: # input / output configurations
         root: null
         genotype: "dna/vcfs"
         phenotype: "dna/colors"
-        phenotype_variant: ""
+        phenotype_variant: "_8_4_2025"
     data_post_process: # where post processed raw data will be
         root: null
         genotype: "dna/processed/genotypes"
-        phenotype: "dna/processed/phenotypes"
+        phenotype: "dna/processed/phenotypes_hindwing_variant"
     results:
         root: null
         training_metadata: "dna/metadata"

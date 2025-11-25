@@ -2,14 +2,22 @@ from collections import defaultdict
 import os
 from enum import Enum
 import math
+import multiprocessing as mp
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.nn.functional import l1_loss, mse_loss
 from captum.attr import LRP, GuidedGradCam, Occlusion, Saliency, ShapleyValueSampling
 from scipy.stats import pearsonr
+from sklearn.metrics import r2_score
 from tqdm import tqdm
+from rich.progress import Progress
+
+from captum.attr._core.lrp import SUPPORTED_NON_LINEAR_LAYERS
+
+SUPPORTED_NON_LINEAR_LAYERS.append(nn.LeakyReLU)
 
 from gtp.models.forward import forward_step
 
@@ -22,25 +30,50 @@ class AttributionMethod(Enum):
     )
 
 
-def test(tr_dloader, val_dloader, test_dloader, model, out_dims, out_dims_start_idx=0):
-    rmses = []
-    for dl in [tr_dloader, val_dloader, test_dloader]:
+def test(tr_dloader, val_dloader, test_dloader, model):
+    results = {}
+
+    for phase, dl in zip(
+        ["train", "val", "test"], [tr_dloader, val_dloader, test_dloader]
+    ):
+        model_output = []
+        actuals = []
         total_rmse = 0
         for batch in dl:
-            mse, rmse = forward_step(
+            mse, rmse, output, actual = forward_step(
                 model,
                 batch,
                 None,
-                out_dims,
-                out_start_idx=out_dims_start_idx,
                 is_train=False,
+                return_output=True,
+                return_y=True,
             )
+            model_output.append(output)
+            actuals.append(actual)
             total_rmse += rmse
 
-        avg_rmse = total_rmse / len(dl)
-        rmses.append(avg_rmse)
+        model_output = np.concatenate(model_output, axis=0)
+        actuals = np.concatenate(actuals, axis=0)
 
-    return rmses
+        avg_rmse = total_rmse / len(dl)
+        results[phase] = {
+            "pearson": float(
+                np.array(
+                    [
+                        pearsonr(p, a).statistic
+                        for a, p in zip(actuals.T, model_output.T)
+                    ]
+                ).mean()
+            ),
+            "r2": float(
+                np.array(
+                    [r2_score(a, p) for a, p in zip(actuals.T, model_output.T)]
+                ).mean()
+            ),
+            "rmse": float(avg_rmse),
+        }
+
+    return results
 
 
 def compile_attribution(attr):
@@ -130,6 +163,7 @@ def get_lrp_attr(m, dloader, targets=0, verbose=False, num_processes=1):
         targets = [targets]
 
     att_model = LRP(m)
+
     all_actuals = []
     all_relevance_scores = []
     for i, batch in tqdm(
@@ -265,12 +299,12 @@ def get_windowed_edit_attr(m, dloader, edits, window=0, verbose=False):
         return edit_loc
 
     change_tracker = defaultdict(list)
+    cur_proc = mp.current_process()
     with torch.no_grad():
         for batch in tqdm(
             dloader,
             desc="Collecting Batched Edits",
-            leave=True,
-            position=2,
+            leave=False,
             disable=not verbose,
         ):
             data, pca = batch
@@ -285,7 +319,6 @@ def get_windowed_edit_attr(m, dloader, edits, window=0, verbose=False):
                 desc="recording changes",
                 colour="#8822CC",
                 leave=False,
-                position=1,
                 disable=not verbose,
             ):
                 edit_loc = get_edit_loc(edit_num, chromosome_length)

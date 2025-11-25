@@ -2,10 +2,11 @@ import json
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Union
+from typing import Union, Any
 
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from gtp.tools.timing import profile_exe_time
 
@@ -55,38 +56,50 @@ def align_data(dna_data, dna_camids, pheno_data):
     return dna_data, dna_camids, pheno_data
 
 
+def extract_metadata_from_scaffold_str(scaffold_str: str, species: str):
+    if species == "erato":
+        chrom_info = scaffold_str.replace("Herato", "")
+        chrom_num = int(chrom_info[:2])
+        scaf_num = int(chrom_info[2:])
+    elif species == "melpomene":
+        chrom_info = scaffold_str.replace("Hmel2", "")
+        chrom_num = int(chrom_info[:2])
+        scaf_num = int(chrom_info[2:-1])
+    else:
+        assert False, f"Invalid species: {species}"
+
+    return chrom_num, scaf_num
+
+
 def get_chromosome_scaffolds(
-    root: Union[str, Path], species: str, chromosome: int
+    root: Union[str, Path], species: str, chromosome: Any
 ) -> Union[str, Path]:
     genotype_path_root = os.path.join(root, f"{species}")
     scaffolds = []
     for subdir in os.listdir(genotype_path_root):
-        if species == "erato":
-            chrom_info = subdir.replace("Herato", "")
-            chrom_num = int(chrom_info[:2])
-            scaf_num = int(chrom_info[2:])
-        elif species == "melpomene":
-            chrom_info = subdir.replace("Hmel2", "")
-            chrom_num = int(chrom_info[:2])
-            scaf_num = int(chrom_info[2:-1])
-        else:
-            assert False, f"Invalid species: {species}"
+        chrom_num, scaf_num = extract_metadata_from_scaffold_str(subdir, species)
 
-        if chrom_num == chromosome:
-            scaffolds.append([os.path.join(genotype_path_root, subdir), scaf_num])
-    scaffolds = sorted(scaffolds, key=lambda x: x[1])
+        if chromosome == "all" or chrom_num == int(chromosome):
+            scaffolds.append(
+                [os.path.join(genotype_path_root, subdir), chrom_num, scaf_num]
+            )
+    scaffolds = sorted(scaffolds, key=lambda x: (x[1], x[2]))
     return [x[0] for x in scaffolds]
 
 
 @profile_exe_time(verbose=False)
 def collect_chromosome(root, species, chromosome):
     scaffolds = get_chromosome_scaffolds(
-        root=root, species=species, chromosome=chromosome
+        root=root,
+        species=species,
+        chromosome=chromosome,
     )
 
     final_camids = None
     compiled = None
-    for scaffold_dir in scaffolds:
+    for scaffold_dir in tqdm(
+        scaffolds, desc="Collecting Chromosome Scaffolds", leave=False, colour="#03A58A"
+    ):
         camids = np.load(os.path.join(scaffold_dir, "camids.npy"))
         data = np.load(os.path.join(scaffold_dir, "ml_ready.npy"))
         sort_idx = np.argsort(camids)
@@ -100,6 +113,27 @@ def collect_chromosome(root, species, chromosome):
             compiled = sorted_data
 
     return final_camids, compiled
+
+
+@profile_exe_time(verbose=False)
+def collect_individual_genomes(root, species):
+    camids = []
+    paths = []
+    for root_dir, dirs, files in tqdm(
+        os.walk(os.path.join(root, species)),
+        desc="Collecting individual genomes",
+        colour="#03A58A",
+    ):
+        for f in files:
+            paths.append(Path(root_dir, f))
+            camid, _ = f.split(".")
+            camids.append(camid)
+
+    sort_idx = np.argsort(camids)
+    sorted_data = np.array(paths)[sort_idx]
+    sorted_camids = np.array(camids)[sort_idx]
+
+    return sorted_camids, sorted_data
 
 
 @profile_exe_time(verbose=False)
@@ -201,17 +235,18 @@ def load_chromosome_data(
     and 4 missing from erato phenotype
     """
 
-    def print_out(x):
-        if verbose:
-            print(x)
-
     # Collect phenotype data
     pca_camids, pca_data = load_phenotype_data(phenotype_folder, species, wing, color)
 
     # Collect genotype data
-    genotype_camids, genotype_data = collect_chromosome(
-        genotype_folder, species, chromosome
-    )
+    if chromosome == "all":
+        genotype_camids, genotype_data = collect_individual_genomes(
+            genotype_folder, species
+        )
+    else:
+        genotype_camids, genotype_data = collect_chromosome(
+            genotype_folder, species, chromosome
+        )
 
     # Align data
     phenotype_data_aligned, genotype_data_aligned, camids_aligned = (

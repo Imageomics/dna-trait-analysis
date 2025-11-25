@@ -6,6 +6,7 @@ class RawDataInputConfigs:
     root: str
     genotype: str
     phenotype: str
+    phenotype_variant: str
 
 
 @dataclass
