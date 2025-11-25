@@ -20,7 +20,7 @@ class ProcessAttributionOptions(BaseOptions):
     hidden_dim: int = 10
     model: str = "soybean"
     species: str = "erato"
-    chromosome: int | str = 1
+    chromosome: int | str = ""
     color: str = "total"
     wing: str = "forewings"
     exp_name: str = "debug"

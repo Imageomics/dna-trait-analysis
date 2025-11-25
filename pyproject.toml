@@ -28,6 +28,8 @@ dependencies = [
     "rich>=14.1.0",
     "gpustat>=1.1.1",
     "polars>=1.32.0",
+    "openpyxl>=3.1.5",
+    "anywidget>=0.9.18",
 ]
 requires-python = ">=3.10"
 authors = []

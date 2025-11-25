@@ -83,8 +83,8 @@ def _process_chromosome(
     model.eval()
 
     for data, phase_str in [
-        (train_data, "training"),
-        (val_data, "validation"),
+        #(train_data, "training"),
+        #(val_data, "validation"),
         (test_data, "test"),
     ]:
         attribution_save_path = (
@@ -298,6 +298,8 @@ def _process_genome(
     options.num_workers = 0  # For multi processing to work, we have to set this to 0 for DataLoader. Otherwise, we get a deadlock.
 
     chromosomes = range(1, configs.global_butterfly_metadata.number_of_chromosomes + 1)
+    if options.chromosome:
+        chromosomes = [options.chromosome]
     tbar = tqdm(
         chromosomes,
         desc="Processing Chromosomes",
