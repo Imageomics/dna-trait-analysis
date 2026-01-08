@@ -1,3 +1,6 @@
+import os
+
+
 def convert_bytes(num):
     """
     this function will convert bytes to MB.... GB... etc
@@ -6,6 +9,10 @@ def convert_bytes(num):
         if num < 1024.0:
             return "%3.1f %s" % (num, x)
         num /= 1024.0
+
+
+def get_filesize(path):
+    return os.path.getsize(path)
 
 
 def create_exp_info_text(species: str, wing: str, color: str, chromosome: int) -> str:

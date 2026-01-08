@@ -58,7 +58,7 @@ def _genotype_preprocess_fn(process_item):
         )
         preprocessor.save_result(save_dir)
     except Exception as e:
-        print(e)
+        print(f"Exception ({pca_csv_path_suffix}): {e}")
         return False
 
     return True
@@ -76,7 +76,7 @@ def preprocess_genotypes(
 
     from tqdm.auto import tqdm
 
-    from gtp.dataloading.data_preprocessors import ButterflyGenePreprocessor
+    from gtp.dataloading.data_preprocessors import ButterflyGenePreprocessorOld as ButterflyGenePreprocessor
     from gtp.dataloading.path_collectors import (
         get_post_processed_genotype_directory,
         get_raw_genotype_input_directory,

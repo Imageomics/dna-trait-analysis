@@ -1,5 +1,6 @@
 import os
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -7,12 +8,12 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.csv as csv
 
-from gtp.dataloading.tools import butterfly_states_to_ml_ready, get_ml_state_map
+from gtp.dataloading.tools import butterfly_states_to_ml_ready
 from gtp.tools.timing import profile_exe_time
 
 
 class DataPreprocessor(ABC):
-    def __init__(self, input_dir, output_dir, verbose=False) -> None:
+    def __init__(self, input_dir, output_dir, verbose=False, **kwargs) -> None:
         super().__init__()
 
         self.input_dir = input_dir
@@ -36,7 +37,7 @@ class DataPreprocessor(ABC):
         pass
 
     @abstractmethod
-    def _process(self):
+    def _process(self, *args, **kwargs):
         pass
 
 
@@ -57,9 +58,10 @@ class ButterflyPatternizePreprocessor(DataPreprocessor):
         self.phenotype_data.to_csv(file_path, index=False)
 
 
-class ButterflyGenePreprocessor(DataPreprocessor):
+class ButterflyGenePreprocessorOld(DataPreprocessor):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.save_format = kwargs.get("save_format", "csv")
         self.genotype_data = None
 
     def _process_with_pandas(
@@ -257,20 +259,25 @@ class ButterflyGenePreprocessor(DataPreprocessor):
     def _save_result(self, path) -> None:
         os.makedirs(path, exist_ok=True)
 
-        all_info_path = os.path.join(path, "all_info.csv")
-        states_path = os.path.join(path, "states.csv")
+        all_info_path = os.path.join(path, f"all_info.{self.save_format}")
+        states_path = os.path.join(path, f"states.{self.save_format}")
         match self._processor:
             case "pandas":
-                csv.write_csv(
-                    pa.Table.from_pandas(self.genotype_data["all_info"]),
-                    all_info_path,
-                )
-                csv.write_csv(
-                    pa.Table.from_pandas(
-                        self.genotype_data["states"], preserve_index=True
-                    ),
-                    states_path,
-                )
+                if self.save_format == "csv":
+                    csv.write_csv(
+                        pa.Table.from_pandas(self.genotype_data["all_info"]),
+                        all_info_path,
+                    )
+                    csv.write_csv(
+                        pa.Table.from_pandas(
+                            self.genotype_data["states"], preserve_index=True
+                        ),
+                        states_path,
+                    )
+                elif self.save_format == "parquet":
+                    self.genotype_data["all_info"].to_parquet(all_info_path)
+                    self.genotype_data["states"].to_parquet(states_path)
+
             case "polars":
                 self.genotype_data["all_info"].write_csv(all_info_path, separator=",")
                 self.genotype_data["states"].write_csv(states_path, separator=",")
@@ -283,3 +290,93 @@ class ButterflyGenePreprocessor(DataPreprocessor):
         np.save(os.path.join(path, "camids.npy"), self.genotype_data["camids"])
         np.save(os.path.join(path, "ml_ready.npy"), self.genotype_data["ml_ready"])
         np.save(os.path.join(path, "positions.npy"), self.genotype_data["positions"])
+
+
+class ButterflyGenePreprocessor(DataPreprocessor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.genotype_data = None
+
+    @profile_exe_time(verbose=False)
+    def _process(
+        self,
+        pca_csv_path_suffix,
+        verbose=False,
+        process_max_rows=None,
+    ):
+        """
+        # of rows = # of positions
+        We know that columns 1-4 give global information while columns 5 - END are the states related
+        to that information for each specimen
+        Column 1: Scaffold Location
+        Column 2: Position in the scaffold
+        Column 3: Reference Allele
+        Column 4: Alternative Allele
+        Columns 5-(# of specimens): [A-Z0-9]*=[01][\/|][01] ex: CAM016525=0|0
+        where the alpha and digits preceeding the = is the specimen id, and
+        the structure 0|0 to the right represent the states of two alleles. Each
+        of which can be either 1 or 0
+
+        Our goal is to create a dataframe where each row is associated with one specimen
+        and the columns will contain the global information previously stated in columns 1-4
+        and the states we extract after the '=' symbol.
+        """
+
+        state_to_bits_map = {
+            "0|0": np.array([0, 0]).astype(np.bool_),
+            "0|1": np.array([0, 1]).astype(np.bool_),
+            "1|0": np.array([1, 0]).astype(np.bool_),
+            "1|1": np.array([1, 1]).astype(np.bool_),
+        }
+
+        specimen_states = defaultdict(list)
+        metadata = []
+
+        with open(os.path.join(self.input_dir, pca_csv_path_suffix), "r") as f:
+            for line in f.readlines():
+                scaffold_name, position, reference, alternative, *states = (
+                    line.strip().split("\t")
+                )
+                for s in states:
+                    camid, state = s.split("=")
+                    state = state.replace("/", "|")
+                    state_array = state_to_bits_map[state]
+                    specimen_states[camid].append(state_array)
+                metadata.append([scaffold_name, position, reference, alternative])
+
+        camids = []
+        final_states = []
+        for camid, states in specimen_states.items():
+            states_stacked = np.stack(states)
+            final_states.append(states_stacked)
+            camids.append(camid)
+
+        final_states = np.stack(final_states)
+
+        metadata_df = pd.DataFrame(
+            metadata, columns=["Scaffold", "Position", "Reference", "Alternative"]
+        )
+        metadata_df.Position = metadata_df.Position.astype(np.uint32)
+
+        self.genotype_data = {
+            "metadata": metadata_df,
+            "states": final_states,
+            "camids": camids,
+        }
+
+    @profile_exe_time(verbose=False)
+    def _save_result(self, path) -> None:
+        os.makedirs(path, exist_ok=True)
+
+        metadata_path = os.path.join(path, "metadata.parquet")
+        states_path = os.path.join(path, "states.npy")
+        camids_path = os.path.join(path, "camids.txt")
+
+        assert self.genotype_data is not None, "Data needs to be filled before saving"
+
+        self.genotype_data["metadata"].to_parquet(metadata_path)
+
+        np.save(states_path, self.genotype_data["states"])
+
+        with open(camids_path, "w") as f:
+            f.write("\n".join(self.genotype_data["camids"]))

@@ -17,6 +17,9 @@ def load_chromosome_and_phenotype_data(
 ):
     genotype_folder = get_post_processed_genotype_directory(configs.io)
     phenotype_folder = get_post_processed_phenotype_directory(configs.io)
+    print(genotype_folder)
+    print(phenotype_folder)
+    exit()
 
     genotype_scope = configs.experiment.genotype_scope
     if options.chromosome == "all":

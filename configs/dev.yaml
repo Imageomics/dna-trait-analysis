@@ -1,0 +1,31 @@
+io: # input / output configurations
+    default_root: "/local/scratch/carlyn.1/dna-dev" # Default root. Used if any 'root' option is null under the 'io' config 
+    raw_data_input: # for the raw data directly downloaded
+        root: "/local/scratch/carlyn.1/"
+        genotype: "dna/vcfs"
+        phenotype: "dna/colors"
+        phenotype_variant: ""
+    data_post_process: # where post processed raw data will be
+        root: null
+        genotype: "dna/processed/genotypes"
+        phenotype: "dna/processed/phenotypes"
+    results:
+        root: null
+        training_metadata: "dna/metadata"
+        training_output: "dna/training_output"
+        plot_output: "dna/plot_results"
+        epistasis_output: "dna/epistasis_output"
+global_butterfly_metadata:
+    species: ["erato", "melpomene"]
+    wings: ["forewings", "hindwings"]
+    phenotypes: ["color_1", "color_2", "color_3", "total"]
+    number_of_chromosomes: 21
+experiment:
+    genotype_scope: "genome" # Either 'genome', 'chromosomes', 'genes'
+    do_subset: false # Whether or not to create a subset of the original data for testing purposes.
+training:
+    train_ratio: 0.8
+    validation_ratio: 0.1
+    seed: 2024
+dev:
+    tmp: "tmp"

@@ -19,7 +19,7 @@ from gtp.dataloading.datasets import GTP_Dataset, GTP_Individual_Dataset
 from gtp.dataloading.path_collectors import get_results_training_output_directory
 from gtp.dataloading.tools import save_json
 from gtp.evaluation import test
-from gtp.models.net import SoyBeanNet, DeepNet, DeepNet2
+from gtp.models.net import DeepNet, DeepNet2, SoyBeanNet
 from gtp.models.scheduler import Scheduler
 from gtp.options.training import TrainingOptions
 from gtp.tools.calculation import calc_pvalue_linear, filter_topk_snps
