@@ -68,6 +68,7 @@ def preprocess_genotypes(
     configs: GenotypeToPhenotypeConfigs,
     force_reprocess: bool = False,
     num_processes: int = 4,
+    chromosome: int = None,
     verbose: bool = False,
 ):
     import os
@@ -76,10 +77,15 @@ def preprocess_genotypes(
 
     from tqdm.auto import tqdm
 
-    from gtp.dataloading.data_preprocessors import ButterflyGenePreprocessorOld as ButterflyGenePreprocessor
+    from gtp.dataloading.data_preprocessors import (
+        ButterflyGenePreprocessorOld as ButterflyGenePreprocessor,
+    )
     from gtp.dataloading.path_collectors import (
         get_post_processed_genotype_directory,
         get_raw_genotype_input_directory,
+    )
+    from gtp.dataloading.tools import (
+        extract_metadata_from_scaffold_str,
     )
 
     genotype_input_dir = get_raw_genotype_input_directory(configs.io)
@@ -101,10 +107,15 @@ def preprocess_genotypes(
     for species in configs.global_butterfly_metadata.species:
         species_genome_path = Path(f"{species}/{configs.experiment.genotype_scope}")
         for root, dirs, files in os.walk(genotype_input_dir / species_genome_path):
-            print(root)
             for i, f in enumerate(files):
                 fname = f.split(".")[0]
+                chrom_num, _ = extract_metadata_from_scaffold_str(fname, species)
 
+                # Skip if specific chromosome is requested
+                if chromosome is not None and chrom_num != chromosome:
+                    continue
+
+                print(chromosome, chrom_num)
                 # Skip if already processed and not being forced to reprocess
                 if not force_reprocess and os.path.exists(
                     genotype_output_dir
@@ -157,24 +168,30 @@ def preprocess_genotypes(
     help="Which preprocessing method to run [phenotype, genotype, both]",
 )
 @click.option(
-    "--verbose/--no-verbose", default=False, help="Whether or not to see logging"
-)
-@click.option(
     "--force-reprocess/--no-force-reprocess",
     default=False,
     help="Whether or not to force reprocessing",
+)
+@click.option(
+    "--chromosome",
+    default=None,
+    type=int,
+    help="Which chromosome to process (if applicable). Default is to process all.",
 )
 @click.option(
     "--num-processes",
     default=4,
     help="Number of processes to use in processing genotypes.",
 )
-def main(configs, method, force_reprocess, num_processes, verbose):
+@click.option(
+    "--verbose/--no-verbose", default=False, help="Whether or not to see logging"
+)
+def main(configs, method, force_reprocess, chromosome, num_processes, verbose):
     cfgs: GenotypeToPhenotypeConfigs = load_configs(configs)
     if method in ["phenotype", "both"]:
         preprocess_phenotypes(cfgs, verbose)
     if method in ["genotype", "both"]:
-        preprocess_genotypes(cfgs, force_reprocess, num_processes, verbose)
+        preprocess_genotypes(cfgs, force_reprocess, num_processes, chromosome, verbose)
 
 
 if __name__ == "__main__":
