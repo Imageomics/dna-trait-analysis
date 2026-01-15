@@ -8,7 +8,7 @@ uv sync
 
 # Set Options
 To personalize options can either:
-    - Change the configurations in `src/gtp/configs/default_configs.yaml`
+    - Change the configurations in `src/gtp/configs/default.yaml`
     - Copy that file and create a new one. Then update ```DEFAULT_YAML_CONFIG_PATH``` in ```src/gtp/configs/loaders.py```
 
 # Run Tests

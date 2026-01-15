@@ -3,6 +3,7 @@ data/
 tmp/
 logs/
 results
+output/
 plot_results
 notebooks/attributions/
 *.pt

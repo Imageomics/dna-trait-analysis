@@ -148,6 +148,8 @@ def collect_chromosome_position_metadata(root, species, chromosome):
             line = f.readline()
             columns = line.split(",")
             # Ignore last column if it has a pandas artifact at the end. Result of incorrect processing :(
+            if "camids" == columns[0]:
+                columns = columns[1:]
             if "index_level" in columns[-1]:
                 columns = columns[:-1]
             positions = [int(col.replace('"', "")) for col in columns]
