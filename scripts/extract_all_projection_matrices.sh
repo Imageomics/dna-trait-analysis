@@ -21,7 +21,8 @@ do
                 out_color_name="color_total"
             fi
             out_file="${root_post_process_dir}${species}_${wing}_${out_color_name}.csv"
-            cmd="Rscript scripts/r/extract_projection_matrix.R ${in_file} ${out_file}"
+            out_file_center="${root_post_process_dir}${species}_${wing}_${out_color_name}_center.csv"
+            cmd="Rscript scripts/r/extract_projection_matrix.R ${in_file} ${out_file} ${out_file_center}"
             echo "Running command: ${cmd}"
             $cmd
         done
